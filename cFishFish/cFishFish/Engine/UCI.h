@@ -2,7 +2,7 @@
 
 #include "Chess.h"
 #include "Search.h"
-
+#include "Book.h"
 
 #include <string>
 #include <regex>
@@ -12,6 +12,8 @@ class UCI {
 
 private:
 	Board* board = new Board;
+	Book book;
+
 	int multiPv = 1;
 	bool debug = false;
 	Search search;
@@ -218,6 +220,13 @@ public:
 					search_time = smart_time;
 				}
 
+				Move book_move = book.probeBook(board->zobrist());
+				if (book_move != 0) {
+					std::cout << "bestmove " << uci::moveToUci(book_move) << std::endl;
+
+					return;
+				}
+
 				//Create a new thread for calculation
 				std::thread t1([&] {
 					//This logic needs to be moved into a thread.
@@ -266,7 +275,17 @@ public:
 
 	}
 
-	std::vector<std::string> split(const std::string& s) {
+	inline int mateDisplayScore(int score) {
+
+		if (std::abs(score) > 98999) {
+			return (1000000 - std::abs(score)) / 2;
+		}
+
+		return 0;
+
+	}
+
+	inline std::vector<std::string> split(const std::string& s) {
 
 		std::vector<std::string> toReturn;
 
@@ -278,16 +297,6 @@ public:
 		}
 
 		return toReturn;
-
-	}
-
-	inline int mateDisplayScore(int score) {
-
-		if (std::abs(score) > 98999) {
-			return (1000000 - std::abs(score)) / 2;
-		}
-
-		return 0;
 
 	}
 

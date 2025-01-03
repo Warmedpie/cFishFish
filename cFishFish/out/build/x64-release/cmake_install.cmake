@@ -1,8 +1,8 @@
-# Install script for directory: C:/Users/Alden/source/repos/cFishFish
+# Install script for directory: C:/Users/Alden/Documents/GitHub/cFishFish/cFishFish
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
-  set(CMAKE_INSTALL_PREFIX "C:/Users/Alden/source/repos/cFishFish/out/install/x64-release")
+  set(CMAKE_INSTALL_PREFIX "C:/Users/Alden/Documents/GitHub/cFishFish/cFishFish/out/install/x64-release")
 endif()
 string(REGEX REPLACE "/$" "" CMAKE_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 
@@ -34,7 +34,7 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("C:/Users/Alden/source/repos/cFishFish/out/build/x64-release/cFishFish/cmake_install.cmake")
+  include("C:/Users/Alden/Documents/GitHub/cFishFish/cFishFish/out/build/x64-release/cFishFish/cmake_install.cmake")
 
 endif()
 
@@ -46,5 +46,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "C:/Users/Alden/source/repos/cFishFish/out/build/x64-release/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "C:/Users/Alden/Documents/GitHub/cFishFish/cFishFish/out/build/x64-release/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

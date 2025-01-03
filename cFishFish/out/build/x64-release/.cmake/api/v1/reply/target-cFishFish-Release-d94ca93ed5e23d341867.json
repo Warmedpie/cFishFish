@@ -115,7 +115,8 @@
 				5,
 				6,
 				8,
-				10
+				10,
+				11
 			]
 		}
 	],
@@ -178,6 +179,11 @@
 		{
 			"backtrace" : 1,
 			"path" : "cFishFish/Engine/ScoredMove.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "cFishFish/Engine/Book.h",
 			"sourceGroupIndex" : 1
 		}
 	],

@@ -39,7 +39,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "c:/Users/Alden/source/repos/cFishFish/out/build/x64-release"
+			"value" : "c:/Users/Alden/Documents/GitHub/cFishFish/cFishFish/out/build/x64-release"
 		},
 		{
 			"name" : "CMAKE_CACHE_MAJOR_VERSION",
@@ -467,7 +467,7 @@
 				}
 			],
 			"type" : "STATIC",
-			"value" : "C:/Users/Alden/source/repos/cFishFish/out/build/x64-release/CMakeFiles/pkgRedirects"
+			"value" : "C:/Users/Alden/Documents/GitHub/cFishFish/cFishFish/out/build/x64-release/CMakeFiles/pkgRedirects"
 		},
 		{
 			"name" : "CMAKE_GENERATOR",
@@ -527,7 +527,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "C:/Users/Alden/source/repos/cFishFish"
+			"value" : "C:/Users/Alden/Documents/GitHub/cFishFish/cFishFish"
 		},
 		{
 			"name" : "CMAKE_INSTALL_PREFIX",
@@ -539,7 +539,7 @@
 				}
 			],
 			"type" : "PATH",
-			"value" : "C:/Users/Alden/source/repos/cFishFish/out/install/x64-release"
+			"value" : "C:/Users/Alden/Documents/GitHub/cFishFish/cFishFish/out/install/x64-release"
 		},
 		{
 			"name" : "CMAKE_LINKER",
@@ -1075,7 +1075,7 @@
 				}
 			],
 			"type" : "STATIC",
-			"value" : "C:/Users/Alden/source/repos/cFishFish/out/build/x64-release"
+			"value" : "C:/Users/Alden/Documents/GitHub/cFishFish/cFishFish/out/build/x64-release"
 		},
 		{
 			"name" : "cFishFish_IS_TOP_LEVEL",
@@ -1099,7 +1099,7 @@
 				}
 			],
 			"type" : "STATIC",
-			"value" : "C:/Users/Alden/source/repos/cFishFish"
+			"value" : "C:/Users/Alden/Documents/GitHub/cFishFish/cFishFish"
 		}
 	],
 	"kind" : "cache",

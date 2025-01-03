@@ -1,8 +1,8 @@
-# Install script for directory: C:/Users/Alden/source/repos/cFishFish/cFishFish
+# Install script for directory: C:/Users/Alden/Documents/GitHub/cFishFish/cFishFish/cFishFish
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
-  set(CMAKE_INSTALL_PREFIX "C:/Users/Alden/source/repos/cFishFish/out/install/x64-release")
+  set(CMAKE_INSTALL_PREFIX "C:/Users/Alden/Documents/GitHub/cFishFish/cFishFish/out/install/x64-release")
 endif()
 string(REGEX REPLACE "/$" "" CMAKE_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 

@@ -87,7 +87,7 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep) {
             //do not reduce moves that are checks
             int LMR = 0;
             if (!inCheck && !board->inCheck()) {
-                LMR = 1;
+                LMR = (int)(depth / 4);
             }
 
             if (i == 0) {
@@ -512,7 +512,7 @@ std::vector<ScoredMove> Search::orderAll(Move table, int depth) {
             Color defender = ~board->sideToMove();
 
             //Hanging
-            if (!board->isAttacked(m.to().index(), defender)) {
+            if (!board->isAttacked(m.to(), defender)) {
                 score += 20000 + to;
             }
             //Winning capture
@@ -523,7 +523,7 @@ std::vector<ScoredMove> Search::orderAll(Move table, int depth) {
                 score += 5000 + to - from;
             }
             else
-                score += (to - from);
+                score += -2000 + (to - from);
         }
         else {
             if (killer_move[depth] == m) {
@@ -536,7 +536,7 @@ std::vector<ScoredMove> Search::orderAll(Move table, int depth) {
                 score += 3000;
             }
 
-            score += history_hueristic[m.to().index()][m.from().index()];
+            score += history_hueristic[m.from().index()][m.to().index()];
         }
 
         ScoredMove sm;
@@ -585,7 +585,7 @@ std::vector<ScoredMove> Search::orderCaptures(Move table) {
             score += 5000 + to - from;
         }
         else
-            score += (to - from);
+            score += -2000 + (to - from);
 
         ScoredMove sm;
         sm.score = score;
@@ -626,7 +626,7 @@ std::vector<ScoredMove> Search::orderQuiet(Move table, int depth) {
             score += 3000;
         }
 
-        score += history_hueristic[m.to().index()][m.from().index()];
+        score += history_hueristic[m.from().index()][m.to().index()];
 
         ScoredMove sm;
         sm.score = score;

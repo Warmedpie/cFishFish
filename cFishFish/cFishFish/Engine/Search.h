@@ -50,8 +50,8 @@ public:
 	inline bool checkTimeout() {
 		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 
-		int t = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
-		int total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
+		int t = (unsigned int)std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
+		int total_ms = (unsigned int)std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
 
 		return (total_ms > search_time);
 			
@@ -102,8 +102,8 @@ public:
 	inline int time() {
 		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 
-		int t = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
-		int total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
+		int t = (unsigned int)std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
+		int total_ms = (unsigned int)std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
 
 		return total_ms;
 	}
@@ -115,8 +115,8 @@ public:
 	inline int nps() {
 		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 
-		int t = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
-		int total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
+		int t = (unsigned int)std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
+		int total_ms = (unsigned int)std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
 
 		return (nodes / (total_ms + 1)) * 1000;
 	}

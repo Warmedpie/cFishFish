@@ -3,7 +3,7 @@
 #
 
 # Add source to this project's executable.
-add_executable (cFishFish "cFishFish.cpp" "cFishFish.h" "Engine/Chess.h"  "Engine/Eval.h" "Engine/Eval.cpp" "Engine/UCI.h" "Engine/TranspositionTable.h" "Engine/TranspositionTable.cpp" "Engine/Search.h" "Engine/Search.cpp" "Engine/ScoredMove.h")
+add_executable (cFishFish "cFishFish.cpp" "cFishFish.h" "Engine/Chess.h"  "Engine/Eval.h" "Engine/Eval.cpp" "Engine/UCI.h" "Engine/TranspositionTable.h" "Engine/TranspositionTable.cpp" "Engine/Search.h" "Engine/Search.cpp" "Engine/ScoredMove.h" "Engine/Book.h")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET cFishFish PROPERTY CXX_STANDARD 20)

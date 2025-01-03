@@ -578,7 +578,7 @@ int Eval::evaluate(Board* board) {
 		score += (int)(12 * phase);
 
 
-	if (white_mg == 0 && board->pieces(PieceType::ROOK, Color::WHITE).count() == 0 && board->pieces(PieceType::QUEEN, Color::WHITE).count() == 0 && board->pieces(PieceType::ROOK, Color::BLACK).count() > 0 || board->pieces(PieceType::QUEEN, Color::BLACK).count() > 0) {
+	if (white_mg == 0 && board->pieces(PieceType::ROOK, Color::WHITE).count() == 0 && board->pieces(PieceType::QUEEN, Color::WHITE).count() == 0 && (board->pieces(PieceType::ROOK, Color::BLACK).count() > 0 || board->pieces(PieceType::QUEEN, Color::BLACK).count() > 0)) {
 		int whiteKing = board->kingSq(Color::WHITE).index();
 		int blackKing = board->kingSq(Color::BLACK).index();
 
@@ -592,7 +592,7 @@ int Eval::evaluate(Board* board) {
 		score += (int)distance;
 	}
 
-	if (black_mg == 0 && board->pieces(PieceType::ROOK, Color::BLACK).count() == 0 && board->pieces(PieceType::QUEEN, Color::BLACK).count() == 0 && board->pieces(PieceType::ROOK, Color::WHITE).count() > 0 || board->pieces(PieceType::QUEEN, Color::WHITE).count() > 0) {
+	if (black_mg == 0 && board->pieces(PieceType::ROOK, Color::BLACK).count() == 0 && board->pieces(PieceType::QUEEN, Color::BLACK).count() == 0 && (board->pieces(PieceType::ROOK, Color::WHITE).count() > 0 || board->pieces(PieceType::QUEEN, Color::WHITE).count() > 0)) {
 		int whiteKing = board->kingSq(Color::WHITE).index();
 		int blackKing = board->kingSq(Color::BLACK).index();
 
@@ -645,23 +645,23 @@ int Eval::PsqM(Board* board, Move m) {
 	}
 
 	if (p == Piece::BLACKPAWN) {
-		float white_mg = blackPhase(board);
+		float white_mg = whitePhase(board);
 		return white_mg * (mgPawnTableBlack[m.to().index()] - mgPawnTableBlack[m.from().index()]) - (white_mg - 1) * (egPawnTableBlack[m.to().index()] - egPawnTableBlack[m.from().index()]);
 	}
 	if (p == Piece::BLACKKNIGHT) {
 		return knightTable[m.to().index()] - knightTable[m.from().index()];
 	}
 	if (p == Piece::BLACKBISHOP) {
-		return bishopTableWhite[m.to().index()] - bishopTableWhite[m.from().index()];
+		return bishopTableBlack[m.to().index()] - bishopTableBlack[m.from().index()];
 	}
 	if (p == Piece::BLACKROOK) {
-		return rookTableWhite[m.to().index()] - rookTableWhite[m.from().index()];
+		return rookTableBlack[m.to().index()] - rookTableBlack[m.from().index()];
 	}
 	if (p == Piece::BLACKQUEEN) {
 		return queenTable[m.to().index()] - queenTable[m.from().index()];
 	}
 	if (p == Piece::BLACKKING) {
-		float white_mg = blackPhase(board);
+		float white_mg = whitePhase(board);
 		return white_mg * (mgKingTableBlack[m.to().index()] - mgKingTableBlack[m.from().index()]) - (white_mg - 1) * (egKingTableBlack[m.to().index()] - egKingTableBlack[m.from().index()]);
 	}
 
