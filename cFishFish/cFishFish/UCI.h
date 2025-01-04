@@ -261,6 +261,7 @@ public:
 					}
 
 					std::cout << "bestmove " << uci::moveToUci(best_move) << std::endl;
+
 					}, depth, search_time);
 
 				t1.detach();

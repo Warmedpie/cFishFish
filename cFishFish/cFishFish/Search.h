@@ -24,7 +24,7 @@ private:
 	std::chrono::steady_clock::time_point start_time;
 	int search_time = 0;
 
-	int order_score[11] = { 82, 337, 365, 477, 1025, 82, 337, 365, 477, 1025,0 };
+	int order_score[13] = { 82, 337, 365, 477, 1025, 0, 82, 337, 365, 477, 1025, 0, 0 };
 
 	int history_hueristic[64][64];
 	Move killer_move[64];

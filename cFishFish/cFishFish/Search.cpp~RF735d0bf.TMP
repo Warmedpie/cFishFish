@@ -139,7 +139,7 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep) {
     if (std::abs(alpha - beta) == 1 && !inCheck && !Eval::onlyPawns(board)) {
         int staticEval = Eval::evaluate(board);
         //DO NOT NULL PRUNE DRAWS, ONLY NULL PRUNE WHEN STATIC EVAL IS GREATER THAN OR EQUAL TO BETA
-        if (staticEval != 0 && staticEval >= beta + 100) {
+        if (staticEval != 0 && staticEval >= beta) {
             int R = depth > 6 ? 4 : 3;
 
             board->makeNullMove();
@@ -201,7 +201,7 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep) {
 
             //Equal value captures
             if (scoredMove.score < 10000) {
-                LMR = (int)(0.5 + std::log(depth) * std::log(i) / 2.9);
+                LMR++;
             }
 
             if (i == 0) {

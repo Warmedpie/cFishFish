@@ -1,8 +1,8 @@
 #include "Eval.h"
 
 //Piece values by phase
-static int mgPieceValues[5] = { 82, 421, 456, 621, 1281 };
-static int egPieceValues[5] = { 101, 375, 398, 687, 1256 };
+static int mgPieceValues[5] = { 82, 337, 365, 477, 1025 };
+static int egPieceValues[5] = { 101, 300, 319, 550, 1005 };
 
 //Adjustment values by pawn count for knights and bishops
 static int knightAdj[9] = { -20, -16, -12, -8, -4,  0,  4,  8, 12 };
@@ -406,7 +406,7 @@ int Eval::evaluate(Board* board) {
 				mg_score_white -= 25;
 
 			//Mobility
-			score += (4 * (pieceMobility(PieceType::KNIGHT, board, sq) - 4));
+			score += (3 * (pieceMobility(PieceType::KNIGHT, board, sq) - 4));
 
 			continue;
 
@@ -422,7 +422,7 @@ int Eval::evaluate(Board* board) {
 				mg_score_white -= 25;
 
 			//Mobility
-			score += (3 * (pieceMobility(PieceType::BISHOP, board, sq) - 7));
+			score += (2 * (pieceMobility(PieceType::BISHOP, board, sq) - 7));
 
 			continue;
 
@@ -455,6 +455,9 @@ int Eval::evaluate(Board* board) {
 
 			mg_score_white += mgKingTableWhite[sq];
 			eg_score_white += egKingTableWhite[sq];
+
+			if (sq > 7)
+				mg_score_white -= 27;
 
 			continue;
 
@@ -490,7 +493,7 @@ int Eval::evaluate(Board* board) {
 				mg_score_black -= 25;
 
 			//Mobility
-			score -= (4 * (pieceMobility(PieceType::KNIGHT, board, sq) - 4));
+			score -= (3 * (pieceMobility(PieceType::KNIGHT, board, sq) - 4));
 
 			continue;
 
@@ -506,7 +509,7 @@ int Eval::evaluate(Board* board) {
 				mg_score_black -= 25;
 
 			//Mobility
-			score -= (3 * (pieceMobility(PieceType::BISHOP, board, sq) - 7));
+			score -= (2 * (pieceMobility(PieceType::BISHOP, board, sq) - 7));
 
 			continue;
 
@@ -539,6 +542,9 @@ int Eval::evaluate(Board* board) {
 
 			mg_score_black += mgKingTableBlack[sq];
 			eg_score_black += egKingTableBlack[sq];
+
+			if (sq < 56)
+				mg_score_black -= 27;
 
 			continue;
 
