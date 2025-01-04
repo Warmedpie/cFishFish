@@ -29,6 +29,8 @@ private:
 	int history_hueristic[64][64];
 	Move killer_move[64];
 
+	Move multipv[10] = { 0,0,0,0,0,0,0,0,0,0 };
+
 public:
 
 	inline void setup(Board* b, int search_time) {
@@ -39,6 +41,9 @@ public:
 		TT.clear();
 
 		for (int i = 0; i < 64; i++) {
+			if (i < 10)
+				multipv[i] = 0;
+
 			killer_move[i] = 0;
 			for (int j = 0; j < 64; j++) {
 				history_hueristic[i][j] = 0;
@@ -56,6 +61,7 @@ public:
 
 	}
 
+	int PVS_ignore(int alpha, int beta, int depth, int plydeep, std::vector<Move> ignore);
 	int PVS(int alpha, int beta, int depth, int plydeep);
 	int negamax(int alpha, int beta, int depth, int plydeep);
 	int qSearch(int alpha, int beta, int depth);
@@ -70,12 +76,12 @@ public:
 	std::vector<ScoredMove> orderQuiet(Move best, int depth);
 	std::vector<ScoredMove> orderChecks();
 
-	inline Move bestMove() {
-		return TT.transposition_search(board->zobrist()).best;
+	inline Move bestMove(int n) {
+		return multipv[n];
 	}
 
-	inline std::string pv() {
-		Move best = TT.transposition_search(board->zobrist()).best;
+	inline std::string pv(int n) {
+		Move best = bestMove(n);
 
 		std::string toReturn;
 		toReturn += uci::moveToUci(best) + " ";
@@ -124,6 +130,15 @@ public:
 
 	inline void hault() {
 		this->search_time = 0;
+	}
+
+	inline bool contains(std::vector<Move> ignore, Move m) {
+		for (int i = 0; i < ignore.size(); i++) {
+			if (m.from() == ignore[i].from())
+				return true;
+		}
+
+		return false;
 	}
 
 };

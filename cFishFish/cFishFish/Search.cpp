@@ -1,5 +1,111 @@
 #include "Search.h"
 
+int Search::PVS_ignore(int alpha, int beta, int depth, int ply_deep, std::vector<Move> ignore) {
+
+    if (checkTimeout())
+        return -312312;
+
+    if (board->isRepetition())
+        return 0;
+
+    nodes++;
+
+    int winLossDraw = mateScore(ply_deep);
+    if (winLossDraw < 1)
+        return winLossDraw;
+
+    bool inCheck = board->inCheck();
+
+    int alpha_orig = alpha;
+
+    Move table_move = multipv[ignore.size()];
+    Move best_move = 0;
+
+    int i = 0;
+
+    //Play the table move
+    if (table_move != 0 && !contains(ignore, table_move)) {
+        board->makeMove(table_move);
+        int score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1);
+        board->unmakeMove(table_move);
+
+        if (score > alpha) {
+            alpha = score;
+            best_move = table_move;
+        }
+
+        i++;
+
+    }
+
+    //Play all other
+    if (alpha < beta) {
+        std::vector<ScoredMove> ordered_moves = orderAll(table_move, depth);
+
+        for (ScoredMove scoredMove : ordered_moves) {
+
+            Move move = scoredMove.move;
+
+            if (contains(ignore, move))
+                continue;
+
+            board->makeMove(move);
+
+            int score = 0;
+
+            if (i == 0) {
+                score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1);
+            }
+            else {
+                //Search with a null window until alpha improves
+                score = -PVS(-alpha - 1, -alpha, depth - 1, ply_deep + 1);
+
+                //re-search required
+                if (score > alpha && beta - alpha > 1) {
+                    score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1);
+                }
+            }
+
+            board->unmakeMove(move);
+
+            if (score > alpha) {
+                alpha = score;
+                best_move = move;
+
+                //Fail-hard beta cut-off
+                if (alpha >= beta) {
+                    break;
+                }
+
+            }
+
+            i++;
+
+        }
+
+
+    }
+
+    nodeType type = EXACT;
+
+    //Fail-high (Cut-node)
+    if (alpha >= beta) {
+        type = CUT;
+    }
+    //Fail Low (All-node)
+    else if (alpha == alpha_orig) {
+        type = ALL;
+    }
+
+    entry insert_node = { depth, type, best_move, alpha };
+
+    TT.transposition_entry(board->zobrist(), insert_node);
+
+    multipv[ignore.size()] = best_move;
+
+    return std::min(alpha, beta);
+
+}
 
 int Search::PVS(int alpha, int beta, int depth, int ply_deep) {
 
@@ -30,11 +136,11 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep) {
     //NULL MOVE PRUNE
     //DO NOT PRUNE IF IN CHECK
     //ONLY PRUNE IN NULL WINDOWS
-    if (depth > 4 && std::abs(alpha - beta) == 1 && !inCheck && !Eval::onlyPawns(board)) {
+    if (std::abs(alpha - beta) == 1 && !inCheck && !Eval::onlyPawns(board)) {
         int staticEval = Eval::evaluate(board);
         //DO NOT NULL PRUNE DRAWS, ONLY NULL PRUNE WHEN STATIC EVAL IS GREATER THAN OR EQUAL TO BETA
         if (staticEval != 0 && staticEval >= beta) {
-            int R = depth > 6 ? 4 : 3;
+            int R = depth > 6 ? 3 : 2;
 
             board->makeNullMove();
             int s = -PVS(-beta, -beta + 1, depth - R - 1, 0);
@@ -72,22 +178,30 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep) {
 
     //Play other moves
     if (alpha < beta) {
-        std::vector<ScoredMove> ordered_moves = orderAll(table_move, depth);
+        std::vector<ScoredMove> ordered_captures = orderCaptures(table_move);
 
-        for (ScoredMove scoredMove : ordered_moves) {
+        //Winning and Equal Captures
+        for (ScoredMove scoredMove : ordered_captures) {
 
-            int score = 0;
+            if (scoredMove.score <= 0)
+                continue;
 
             Move move = scoredMove.move;
 
             board->makeMove(move);
 
+            int score = 0;
             //Late move reductions
             //Do not reduce when in check
             //do not reduce moves that are checks
             int LMR = 0;
             if (!inCheck && !board->inCheck()) {
-                LMR = (int)(depth / 4);
+                LMR = (int)(0.3 + std::log(depth) * std::log(i) / 3.35);
+            }
+
+            //Equal value captures
+            if (scoredMove.score < 10000) {
+                LMR++;
             }
 
             if (i == 0) {
@@ -105,33 +219,129 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep) {
 
             board->unmakeMove(move);
 
-
             if (score > alpha) {
                 alpha = score;
                 best_move = move;
 
+                //Fail-hard beta cut-off
                 if (alpha >= beta) {
-
-                    bool capture = !(board->at(move.to()) == Piece::NONE);
-                    if (!capture) {
-                        history_hueristic[move.from().index()][move.to().index()] += depth * depth;
-
-                        if (killer_move[depth] == 0) {
-                            killer_move[depth] = move;
-                        }
-
-                    }
-
                     break;
-
                 }
 
             }
 
             i++;
 
+        }
+
+        //Quiet moves
+        if (alpha < beta) {
+
+            std::vector<ScoredMove> ordered_moves = orderQuiet(table_move, depth);
+
+            for (ScoredMove scoredMove : ordered_moves) {
+
+                Move move = scoredMove.move;
+
+                board->makeMove(move);
+
+                int score = 0;
+                //Late move reductions
+                //Do not reduce when in check
+                //do not reduce moves that are checks
+                int LMR = 0;
+                if (!inCheck && !board->inCheck()) {
+                    LMR = (int)(0.7844 + std::log(depth) * std::log(i) / 2.4696);
+                }
+
+                if (i == 0) {
+                    score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1);
+                }
+                else {
+                    //Search with a null window until alpha improves
+                    score = -PVS(-alpha - 1, -alpha, depth - 1 - LMR, ply_deep + 1);
+
+                    //re-search required
+                    if (score > alpha && beta - alpha > 1) {
+                        score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1);
+                    }
+                }
+
+                board->unmakeMove(move);
+
+                if (score > alpha) {
+                    alpha = score;
+                    best_move = move;
+
+                    //Fail-hard beta cut-off
+                    if (alpha >= beta) {
+
+                        history_hueristic[move.from().index()][move.to().index()] += depth;
+
+                        if (killer_move[depth] == 0) {
+                            killer_move[depth] = move;
+                        }
+
+                        break;
+                    }
+
+                }
+
+                i++;
+            }
 
         }
+
+        if (alpha < beta) {
+            //Losing Captures
+            for (ScoredMove scoredMove : ordered_captures) {
+
+                if (scoredMove.score > 0)
+                    continue;
+
+                Move move = scoredMove.move;
+
+                board->makeMove(move);
+
+                int score = 0;
+                //Late move reductions
+                //Do not reduce when in check
+                //do not reduce moves that are checks
+                int LMR = 0;
+                if (!inCheck && !board->inCheck()) {
+                    LMR = (int)(0.7844 + std::log(depth) * std::log(i) / 2.4696) + 1;
+                }
+
+                if (i == 0) {
+                    score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1);
+                }
+                else {
+                    //Search with a null window until alpha improves
+                    score = -PVS(-alpha - 1, -alpha, depth - 1 - LMR, ply_deep + 1);
+
+                    //re-search required
+                    if (score > alpha && beta - alpha > 1) {
+                        score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1);
+                    }
+                }
+
+                board->unmakeMove(move);
+
+                if (score > alpha) {
+                    alpha = score;
+                    best_move = move;
+
+                    //Fail-hard beta cut-off
+                    if (alpha >= beta) {
+                        break;
+                    }
+
+                }
+
+                i++;
+            }
+        }
+
 
     }
 
@@ -178,8 +388,6 @@ int Search::negamax(int alpha, int beta, int depth, int ply_deep) {
     if (depth <= 0) {
         return qSearch(alpha, beta, 7);
     }
-
-    bool inCheck = board->inCheck();
 
     //Razoring
     //if our position is really poor, we do not need to investigate at low depth nodes
@@ -526,6 +734,7 @@ std::vector<ScoredMove> Search::orderAll(Move table, int depth) {
                 score += -2000 + (to - from);
         }
         else {
+
             if (killer_move[depth] == m) {
                 score += 3200;
             }

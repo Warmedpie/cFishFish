@@ -35,7 +35,7 @@ public:
 
 				std::cout << "id name cFishFish v1.0" << std::endl;
 				std::cout << "id author Warmedpie" << std::endl;
-				//std::cout << "option name MultiPV type spin default 1 min 1 max 5" << std::endl;
+				std::cout << "option name MultiPV type spin default 1 min 1 max 10" << std::endl;
 				std::cout << "uciok" << std::endl;
 
 				continue;
@@ -85,7 +85,7 @@ public:
 								[](unsigned char c) { return std::toupper(c); });
 
 							if (arguments[i + 2] == "MULTIPV" && arguments[i + 3] == "VALUE") {
-								multiPv = std::min(std::stoi(arguments[i + 4]), 5);
+								multiPv = std::min(std::stoi(arguments[i + 4]), 10);
 
 								if (multiPv < 1)
 									multiPv = 1;
@@ -227,27 +227,40 @@ public:
 					//This logic needs to be moved into a thread.
 					search.setup(board, search_time);
 
-					Move best = 0;
+
+					Move best_move = 0;
 					for (int i = 3; i <= depth; i++) {
-						int score = search.PVS(-9999999, 9999999, i, 0);
+
+						std::vector<Move> ignore = {};
+						int score = 0;
+						for (int multi = 0; multi < multiPv; multi++) {
+							score = search.PVS_ignore(-9999999, 9999999, i, 0, ignore);
+
+							if (score == -312312 || score == 312312)
+								break;
+
+							Move best = search.bestMove(multi);
+
+							int mate_score = mateDisplayScore(score);
+
+							if (score < 0)
+								mate_score *= -1;
+
+							if (mate_score == 0)
+								std::cout << "info multipv " << multi + 1 << " depth " << i << " score cp " << score << " time " << search.time() << " nodes " << search.getNodes() << " nps " << search.nps() << " tbhits " << search.tb_hits() << " pv " << search.pv(multi) << std::endl;
+							else
+								std::cout << "info multipv " << multi + 1 << " depth " << i << " score mate " << mate_score << " time " << search.time() << " nodes " << search.getNodes() << " nps " << search.nps() << " tbhits " << search.tb_hits() << " pv " << search.pv(multi) << std::endl;
+
+							ignore.push_back(best);
+						}
 
 						if (score == -312312 || score == 312312)
 							break;
 
-						best = search.bestMove();
-
-						int mate_score = mateDisplayScore(score);
-
-						if (score < 0)
-							mate_score *= -1;
-
-						if (mate_score == 0)
-							std::cout << "info depth " << i << " score cp " << score << " time " << search.time() << " nodes " << search.getNodes() << " nps " << search.nps() << " tbhits " << search.tb_hits() << " pv " << search.pv() << std::endl;
-						else
-							std::cout << "info depth " << i << " score mate " << mate_score << " time " << search.time() << " nodes " << search.getNodes() << " nps " << search.nps() << " tbhits " << search.tb_hits() << " pv " << search.pv() << std::endl;
+						best_move = search.bestMove(0);
 					}
 
-					std::cout << "bestmove " << uci::moveToUci(best) << std::endl;
+					std::cout << "bestmove " << uci::moveToUci(best_move) << std::endl;
 					}, depth, search_time);
 
 				t1.detach();

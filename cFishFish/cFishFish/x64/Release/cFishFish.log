@@ -1,1 +1,2 @@
-﻿  cFishFish.vcxproj -> C:\Users\Alden\Documents\GitHub\cFishFish\cFishFish\x64\Release\cFishFish.exe
+﻿Search.cpp(17,10): warning : unused variable 'inCheck' [-Wunused-variable]
+  cFishFish.vcxproj -> C:\Users\Alden\Documents\GitHub\cFishFish\cFishFish\x64\Release\cFishFish.exe
