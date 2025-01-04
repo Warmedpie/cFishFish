@@ -1,23 +1,24 @@
-﻿// cFishFish.cpp : Defines the entry point for the application.
+// cFishFish.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
-#include "cFishFish.h"
-#include "Engine/Eval.h"
-#include "Engine/UCI.h"
+#include <iostream>
 
-int main()
-{
+#include <iostream>
+#include "Chess.h"
+#include "UCI.h"
 
-	UCI uci;
+using namespace chess;
 
-	Board* board = new Board;
+int main() {
+
+	UCI* uci = new UCI;
 
 	while (true) {
 
 		std::string command;
 		std::getline(std::cin, command);
 
-		uci.parse(command);
+		uci->parse(command);
 
 	}
 	return 0;
