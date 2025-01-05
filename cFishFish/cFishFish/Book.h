@@ -15,6 +15,9 @@ private:
 
 public:
 	inline Book() {
+
+		srand(time(NULL));
+
 		std::fstream file;
 		file.open("book.txt");
 		std::string line;
@@ -26,7 +29,10 @@ public:
 			std::vector<std::string> moveList = split(line);
 
 			if (book.count(b.zobrist())) {
-				book[b.zobrist()].push_back(uci::uciToMove(b, moveList[0]));
+
+				if (!contains(book[b.zobrist()], uci::uciToMove(b, moveList[0]))) {
+					book[b.zobrist()].push_back(uci::uciToMove(b, moveList[0]));
+				}
 			}
 			else {
 				book[b.zobrist()] = { uci::uciToMove(b, moveList[0]) };
@@ -37,7 +43,7 @@ public:
 
 				b.makeMove(m);
 
-				if (book.count(b.zobrist())) {
+				if (book.count(b.zobrist()) && !contains(book[b.zobrist()], uci::uciToMove(b, moveList[0]))) {
 					book[b.zobrist()].push_back(uci::uciToMove(b, moveList[i + 1]));
 				}
 				else {
@@ -71,11 +77,22 @@ public:
 	inline Move probeBook(uint64_t hash) {
 		if (book.count(hash)) {
 
+			std::cout << book[hash].size() << std::endl;
+
 			int i = rand() % book[hash].size();
 			return book[hash][i];
 		}
 
 		return 0;
+	}
+
+	inline bool contains(std::vector<Move> move_list, Move m) {
+		for (int i = 0; i < move_list.size(); i++) {
+			if (m.from() == move_list[i].from())
+				return true;
+		}
+
+		return false;
 	}
 
 };
