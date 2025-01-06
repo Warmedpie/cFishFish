@@ -379,6 +379,10 @@ int Eval::evaluate(Board* board) {
 
 	}
 
+	//Re-init pawn bitboards for other pieces to use.
+	white_pawn_BB = board->pieces(PieceType::PAWN, Color::WHITE);
+	black_pawn_BB = board->pieces(PieceType::PAWN, Color::BLACK);
+
 	//Knights
 	while (white_knight_BB.getBits()) {
 		int sq = white_knight_BB.pop();
