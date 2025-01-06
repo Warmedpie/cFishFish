@@ -76,9 +76,6 @@ public:
 
 	inline Move probeBook(uint64_t hash) {
 		if (book.count(hash)) {
-
-			std::cout << book[hash].size() << std::endl;
-
 			int i = rand() % book[hash].size();
 			return book[hash][i];
 		}

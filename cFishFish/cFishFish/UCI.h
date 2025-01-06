@@ -3,6 +3,7 @@
 #include "Chess.h"
 #include "Search.h"
 #include "Book.h"
+#include "Eval.h"
 
 #include <string>
 #include <regex>
@@ -154,6 +155,13 @@ public:
 
 				continue;
 			}
+
+			if (argument == "STATIC") {
+				std::cout << Eval::evaluate(board) << std::endl;
+
+				continue;
+			}
+
 
 			if (argument == "GO") {
 				int depth = 32;

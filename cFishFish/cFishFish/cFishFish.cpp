@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include "Chess.h"
+#include "Eval.h"
 #include "UCI.h"
 
 using namespace chess;

@@ -174,16 +174,42 @@ static int mateTableKing[64] = {
 		-1000, -500, -500, -500, -500, -500, -500, -1000,
 };
 
-static int CENTER_MANHATTAN_DISTANCE[64] = {
-		6, 5, 4, 3, 3, 4, 5, 6,
-		5, 4, 3, 2, 2, 3, 4, 5,
-		4, 3, 2, 1, 1, 2, 3, 4,
-		3, 2, 1, 0, 0, 1, 2, 3,
-		3, 2, 1, 0, 0, 1, 2, 3,
-		4, 3, 2, 1, 1, 2, 3, 4,
-		5, 4, 3, 2, 2, 3, 4, 5,
-		6, 5, 4, 3, 3, 4, 5, 6
+static int attacking_weight[8] = { 0, 0, 50, 75, 88, 94, 97, 99 };
+
+static int manhattan_distace[64][64];
+
+static const int SafetyTable[100] = {
+  0,  0,   1,   2,   3,   5,   7,   9,  12,  15,
+  18,  22,  26,  30,  35,  39,  44,  50,  56,  62,
+  68,  75,  82,  85,  89,  97, 105, 113, 122, 131,
+  140, 150, 169, 180, 191, 202, 213, 225, 237, 248,
+  260, 272, 283, 295, 307, 319, 330, 342, 354, 366,
+  377, 389, 401, 412, 424, 436, 448, 459, 471, 483,
+  494, 500, 500, 500, 500, 500, 500, 500, 500, 500,
+  500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
+  500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
+  500, 500, 500, 500, 500, 500, 500, 500, 500, 500
 };
+
+int distance(int sq1, int sq2) {
+	int file1, file2, rank1, rank2;
+	int rankDistance, fileDistance;
+	file1 = sq1 & 7;
+	file2 = sq2 & 7;
+	rank1 = sq1 >> 3;
+	rank2 = sq2 >> 3;
+	rankDistance = abs(rank2 - rank1);
+	fileDistance = abs(file2 - file1);
+	return rankDistance + fileDistance;
+}
+
+void Eval::setup() {
+	for (int i = 0; i < 64; i++) {
+		for (int j = 0; j < 64; j++) {
+			manhattan_distace[i][j] = distance(i,j);
+		}
+	}
+}
 
 
 float Eval::whitePhase(Board* board) {
@@ -234,6 +260,21 @@ int Eval::winnable(Board* board) {
 	return 0;
 }
 
+int Eval::isKingSquare(Board* board, int sq) {
+	int distWhite = std::abs(board->kingSq(Color::WHITE).index() - sq);
+
+	if (distWhite == 1 || distWhite == 7 || distWhite == 8 || distWhite == 9)
+		return 1;
+
+	int distBlack = std::abs(board->kingSq(Color::BLACK).index() - sq);
+
+	if (distBlack == 1 || distBlack == 7 || distBlack == 8 || distBlack == 9)
+		return -1;
+
+	return 0;
+
+}
+
 int Eval::pieceMobility(PieceType pt, Board* b, int sq) {
 	Bitboard occ_white = b->us(Color::WHITE);
 	Bitboard occ_black = b->us(Color::BLACK);
@@ -255,6 +296,37 @@ int Eval::pieceMobility(PieceType pt, Board* b, int sq) {
 	}
 
 	return 0;
+}
+
+bool Eval::attackedBy(Board* b, Square sq, PieceType pt, Color side) {
+	Bitboard occ_other = b->us(~side);
+
+	if (pt == PieceType::KNIGHT) {
+		if (attacks::knight(sq) & b->pieces(PieceType::KNIGHT, side)) return true;
+
+		return false;
+	}
+
+	if (pt == PieceType::BISHOP) {
+		if (attacks::bishop(sq, occ_other) & (b->pieces(PieceType::BISHOP, side))) return true;
+
+		return false;
+	}
+
+	if (pt == PieceType::ROOK) {
+		if (attacks::rook(sq, occ_other) & (b->pieces(PieceType::ROOK, side))) return true;
+
+		return false;
+	}
+
+	if (pt == PieceType::QUEEN) {
+		if (attacks::queen(sq, occ_other) & (b->pieces(PieceType::QUEEN, side))) return true;
+
+		return false;
+	}
+
+	return false;
+
 }
 
 int Eval::evaluate(Board* board) {
@@ -293,27 +365,86 @@ int Eval::evaluate(Board* board) {
 	int attack_white_weight = 0;
 	int attack_black_weight = 0;
 
-	int attack_squares_white = 0;
-	int attack_squares_black = 0;
-
-	int defender_white_knight = 0;
-	int defender_black_knight = 0;
-
-	int white_shield = 0;
-	int black_shield = 0;
-
-	Bitboard white_ring = kingRing(whiteKing);
-	Bitboard black_ring = kingRing(blackKing);
-	Bitboard white_bb = board->us(Color::WHITE);
-	Bitboard black_bb = board->us(Color::BLACK);
-	Bitboard white_pawn_bb = board->pieces(PieceType::PAWN, Color::WHITE);
-	Bitboard black_pawn_bb = board->pieces(PieceType::PAWN, Color::BLACK);
-
+	int king_tropism_white = 0;
+	int king_tropism_black = 0;
 
 	for (int sq = 0; sq < 64; sq++) {
 
 		Square thisSq = Square(sq);
+
 		Piece p = board->at(thisSq);
+
+		int kingSquare = isKingSquare(board, sq);
+
+		//Square touches white king
+		if (kingSquare == 1) {
+
+			//Knight attacks
+			if (attackedBy(board, thisSq, PieceType::KNIGHT, Color::BLACK)) {
+				attack_black_count++;
+				attack_black_weight += 20;
+			}
+
+			//Bishop attacks (x-ray)
+			if (attackedBy(board, thisSq, PieceType::BISHOP, Color::BLACK)) {
+				attack_black_count++;
+				attack_black_weight += 20;
+			}
+
+			//Queen attacks (x-ray)
+			if (attackedBy(board, thisSq, PieceType::QUEEN, Color::BLACK)) {
+				attack_black_count++;
+				attack_black_weight += 80;
+			}
+
+			//Rook attacks (x-ray)
+			if (attackedBy(board, thisSq, PieceType::ROOK, Color::BLACK)) {
+				attack_black_count++;
+				attack_black_weight += 40;
+			}
+
+			//Knight Defender
+			if (attackedBy(board, thisSq, PieceType::KNIGHT, Color::WHITE)) {
+				attack_black_count--;
+				attack_black_weight -= 20;
+			}
+
+		}
+
+		//Square touches black king
+		if (kingSquare == -1) {
+
+			//Knight attacks
+			if (attackedBy(board, thisSq, PieceType::KNIGHT, Color::WHITE)) {
+				attack_white_count++;
+				attack_white_count += 20;
+			}
+
+			//Bishop attacks (x-ray)
+			if (attackedBy(board, thisSq, PieceType::BISHOP, Color::WHITE)) {
+				attack_white_count++;
+				attack_white_count += 20;
+			}
+
+			//Queen attacks (x-ray)
+			if (attackedBy(board, thisSq, PieceType::QUEEN, Color::WHITE)) {
+				attack_white_count++;
+				attack_white_count += 80;
+			}
+
+			//Rook attacks (x-ray)
+			if (attackedBy(board, thisSq, PieceType::ROOK, Color::WHITE)) {
+				attack_white_count++;
+				attack_white_count += 40;
+			}
+
+			//Knight Defender
+			if (attackedBy(board, thisSq, PieceType::KNIGHT, Color::BLACK)) {
+				attack_white_count--;
+				attack_white_count -= 20;
+			}
+
+		}
 
 		if (p == Piece::NONE) {
 			continue;
@@ -325,11 +456,11 @@ int Eval::evaluate(Board* board) {
 			eg_score_white += egPieceValues[0] + egPawnTableWhite[sq];
 
 			//Pawn shield
-			if (white_ring.check(sq) && whiteKing < 8)
-				white_shield++;
+			if (kingSquare == 1 && whiteKing < 8)
+				mg_score_white += 37;
 
-			if (white_ring.check(sq) && whiteKing >= 8)
-				white_shield--;
+			if (kingSquare == 1 && whiteKing >= 8)
+				mg_score_white -= 37;
 
 			//Space
 			if ((sq + 8 <= 63) && board->at(Square(sq + 8)) != Piece::WHITEPAWN) {
@@ -338,10 +469,6 @@ int Eval::evaluate(Board* board) {
 					score += 2;
 				}
 			}
-
-			//Center control
-			if (CENTER_MANHATTAN_DISTANCE[sq] <= 1)
-				mg_score_white += 4;
 
 			continue;
 		}
@@ -358,21 +485,7 @@ int Eval::evaluate(Board* board) {
 			//Mobility
 			score += (3 * (pieceMobility(PieceType::KNIGHT, board, sq) - 4));
 
-			int atkSq = (attacks::knight(thisSq) & black_ring).count();
-			if (atkSq) {
-				attack_white_count++;
-				attack_white_weight += 81;
-				attack_squares_white += atkSq;
-			}
-
-			int defSq = (attacks::knight(thisSq) & white_ring).count();
-			if (defSq) {
-				defender_white_knight+= defSq;
-			}
-
-			//Center control
-			if (CENTER_MANHATTAN_DISTANCE[sq] <= 2)
-				mg_score_white += 4;
+			king_tropism_white += 14 - manhattan_distace[sq][blackKing];
 
 			continue;
 
@@ -390,12 +503,7 @@ int Eval::evaluate(Board* board) {
 			//Mobility
 			score += (2 * (pieceMobility(PieceType::BISHOP, board, sq) - 7));
 
-			int atkSq = (attacks::bishop(thisSq, (black_bb | white_pawn_bb)) & black_ring).count();
-			if (atkSq) {
-				attack_white_count++;
-				attack_white_weight += 52;
-				attack_squares_white += atkSq;
-			}
+			king_tropism_white += 14 - manhattan_distace[sq][blackKing];
 
 			continue;
 
@@ -408,13 +516,7 @@ int Eval::evaluate(Board* board) {
 			//Mobility
 			score += (2 * (pieceMobility(PieceType::ROOK, board, sq) - 7));
 
-
-			int atkSq = (attacks::rook(thisSq, (black_bb | white_pawn_bb)) & black_ring).count();
-			if (atkSq) {
-				attack_white_count++;
-				attack_white_weight += 44;
-				attack_squares_white += atkSq;
-			}
+			king_tropism_white += 14 - manhattan_distace[sq][blackKing];
 
 			continue;
 
@@ -428,12 +530,7 @@ int Eval::evaluate(Board* board) {
 			//Mobility
 			score += (pieceMobility(PieceType::QUEEN, board, sq) - 14);
 
-			int atkSq = (attacks::queen(thisSq, (black_bb | white_pawn_bb)) & black_ring).count();
-			if (atkSq) {
-				attack_white_count++;
-				attack_white_weight += 30;
-				attack_squares_white += atkSq;
-			}
+			king_tropism_white += 14 - manhattan_distace[sq][blackKing] / 2;
 
 			continue;
 
@@ -457,11 +554,11 @@ int Eval::evaluate(Board* board) {
 			eg_score_black += egPieceValues[0] + egPawnTableBlack[sq];
 
 			//Pawn shield on first
-			if (black_ring.check(sq) && blackKing > 55)
-				black_shield++;
+			if (kingSquare == -1 && blackKing > 55)
+				mg_score_black += 37;
 
-			if (black_ring.check(sq) && blackKing <= 55)
-				black_shield--;
+			if (kingSquare == -1 && blackKing <= 55)
+				mg_score_black -= 37;
 
 			//Space
 			if ((sq - 8 > 0) && board->at(Square(sq - 8)) != Piece::BLACKPAWN) {
@@ -470,10 +567,6 @@ int Eval::evaluate(Board* board) {
 					score -= 2;
 				}
 			}
-
-			//Center control
-			if (CENTER_MANHATTAN_DISTANCE[sq] <= 1)
-				mg_score_black += 4;
 
 			continue;
 		}
@@ -490,22 +583,7 @@ int Eval::evaluate(Board* board) {
 			//Mobility
 			score -= (3 * (pieceMobility(PieceType::KNIGHT, board, sq) - 4));
 
-			int atkSq = (attacks::knight(thisSq) & white_ring).count();
-			if (atkSq) {
-				attack_black_count++;
-				attack_black_weight += 81;
-				attack_squares_black += atkSq;
-			}
-
-			int defSq = (attacks::knight(thisSq) & black_ring).count();
-			if (defSq) {
-				defender_black_knight += defSq;
-			}
-
-
-			//Center control
-			if (CENTER_MANHATTAN_DISTANCE[sq] <= 2)
-				mg_score_black += 4;
+			king_tropism_black += 14 - manhattan_distace[sq][whiteKing];
 
 			continue;
 
@@ -523,12 +601,7 @@ int Eval::evaluate(Board* board) {
 			//Mobility
 			score -= (2 * (pieceMobility(PieceType::BISHOP, board, sq) - 7));
 
-			int atkSq = (attacks::bishop(thisSq, (white_bb | black_pawn_bb)) & white_ring).count();
-			if (atkSq) {
-				attack_black_count++;
-				attack_black_weight += 52;
-				attack_squares_black += atkSq;
-			}
+			king_tropism_black += 14 - manhattan_distace[sq][whiteKing];
 
 			continue;
 
@@ -541,12 +614,7 @@ int Eval::evaluate(Board* board) {
 			//Mobility
 			score -= (2 * (pieceMobility(PieceType::ROOK, board, sq) - 7));
 
-			int atkSq = (attacks::rook(thisSq, (white_bb | black_pawn_bb)) & white_ring).count();
-			if (atkSq) {
-				attack_black_count++;
-				attack_black_weight += 44;
-				attack_squares_black += atkSq;
-			}
+			king_tropism_black += 14 - manhattan_distace[sq][whiteKing];
 
 			continue;
 
@@ -560,12 +628,7 @@ int Eval::evaluate(Board* board) {
 			//Mobility
 			score -= (pieceMobility(PieceType::QUEEN, board, sq) - 14);
 
-			int atkSq = (attacks::queen(thisSq, (white_bb | black_pawn_bb)) & white_ring).count();
-			if (atkSq) {
-				attack_black_count++;
-				attack_black_weight += 30;
-				attack_squares_black += atkSq;
-			}
+			king_tropism_black += 14 - manhattan_distace[sq][whiteKing] / 2;
 
 			continue;
 
@@ -610,22 +673,12 @@ int Eval::evaluate(Board* board) {
 	if (board->pieces(PieceType::ROOK, Color::BLACK).count() == 2)
 		score += (int)(12 * phase);
 
-	int attack_score_white = attack_white_count > 1 ? (attack_white_count * attack_white_weight) +
-		(69 * attack_squares_white) -
-		(black_shield * 50) -
-		(defender_black_knight * 45) : 0;
+	//Attacking score
+	score += attack_white_weight * attacking_weight[attack_white_count] / 100;
+	score -= attack_black_weight * attacking_weight[attack_black_count] / 100;
 
-
-	int attack_score_black = attack_black_count > 1 ? (attack_black_count * attack_black_weight) +
-		(69 * attack_squares_black) -
-		(white_shield * 50) -
-		(defender_white_knight * 45) : 0;
-
-	if (attack_score_white > 0)
-		score += attack_score_white * phase;
-
-	if (attack_score_black > 0)
-		score -= attack_score_black * phase;
+	score += SafetyTable[king_tropism_white];
+	score -= SafetyTable[king_tropism_black];
 
 	if (white_mg == 0 && board->pieces(PieceType::ROOK, Color::WHITE).count() == 0 && board->pieces(PieceType::QUEEN, Color::WHITE).count() == 0 && (board->pieces(PieceType::ROOK, Color::BLACK).count() > 0 || board->pieces(PieceType::QUEEN, Color::BLACK).count() > 0)) {
 
@@ -662,10 +715,6 @@ int Eval::evaluate(Board* board) {
 
 	return score;
 
-}
-
-Bitboard Eval::kingRing(int king_sq) {
-	return attacks::king(king_sq);
 }
 
 int Eval::PsqM(Board* board, Move m) {
