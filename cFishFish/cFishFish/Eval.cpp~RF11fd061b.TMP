@@ -207,13 +207,13 @@ float Eval::blackPhase(Bitboard black_knight_BB, Bitboard black_bishop_BB, Bitbo
 }
 
 int Eval::winnable(Bitboard white_pawn_BB, Bitboard white_knight_BB, Bitboard white_bishop_BB, Bitboard white_rook_BB, Bitboard white_queen_BB, Bitboard black_pawn_BB, Bitboard black_knight_BB, Bitboard black_bishop_BB, Bitboard black_rook_BB, Bitboard black_queen_BB) {
-	if (white_pawn_BB.count() != 0 || black_pawn_BB.count() != 0)
+	if (white_pawn_BB.getBits() != 0 || black_pawn_BB.getBits() != 0)
 		return 1;
 
-	if (white_queen_BB.count() != 0 || black_queen_BB.count() != 0)
+	if (white_queen_BB.getBits() != 0 || black_queen_BB.getBits() != 0)
 		return 1;
 
-	if (white_rook_BB.count() != 0 || black_rook_BB.count() != 0)
+	if (white_rook_BB.getBits() != 0 || black_rook_BB.getBits() != 0)
 		return 1;
 
 
@@ -257,16 +257,12 @@ int Eval::evaluate(Board* board) {
 	//Pieces
 	Bitboard white_pawn_BB = board->pieces(PieceType::PAWN, Color::WHITE);
 	Bitboard black_pawn_BB = board->pieces(PieceType::PAWN, Color::BLACK);
-
 	Bitboard white_knight_BB = board->pieces(PieceType::KNIGHT, Color::WHITE);
 	Bitboard black_knight_BB = board->pieces(PieceType::KNIGHT, Color::BLACK);
-
 	Bitboard white_bishop_BB = board->pieces(PieceType::BISHOP, Color::WHITE);
 	Bitboard black_bishop_BB = board->pieces(PieceType::BISHOP, Color::BLACK);
-
 	Bitboard white_rook_BB = board->pieces(PieceType::ROOK, Color::WHITE);
 	Bitboard black_rook_BB = board->pieces(PieceType::ROOK, Color::BLACK);
-
 	Bitboard white_queen_BB = board->pieces(PieceType::QUEEN, Color::WHITE);
 	Bitboard black_queen_BB = board->pieces(PieceType::QUEEN, Color::BLACK);
 
@@ -316,17 +312,14 @@ int Eval::evaluate(Board* board) {
 	int white_shield = 0;
 	int black_shield = 0;
 
-	Bitboard white_ring = kingRing(whiteKing) | white_king_BB;
-	Bitboard black_ring = kingRing(blackKing) | black_king_BB;
-	Bitboard white_bb = white_pawn_BB | white_knight_BB | white_bishop_BB | white_rook_BB | white_queen_BB;
-	Bitboard black_bb = black_pawn_BB | black_knight_BB | black_bishop_BB | black_rook_BB | black_queen_BB;
+	Bitboard white_ring = kingRing(whiteKing);
+	Bitboard black_ring = kingRing(blackKing);
+	Bitboard white_bb = board->us(Color::WHITE);
+	Bitboard black_bb = board->us(Color::BLACK);
 
-
-	/* PIECE AND PIECE SQUARES */
-
-	//Pawns
 	while (white_pawn_BB.getBits()) {
 		int sq = white_pawn_BB.pop();
+
 
 		mg_score_white += mgPieceValues[0] + mgPawnTableWhite[sq];
 		eg_score_white += egPieceValues[0] + egPawnTableWhite[sq];
@@ -379,7 +372,6 @@ int Eval::evaluate(Board* board) {
 
 	}
 
-	//Knights
 	while (white_knight_BB.getBits()) {
 		int sq = white_knight_BB.pop();
 		Square thisSq = Square(sq);
@@ -445,7 +437,7 @@ int Eval::evaluate(Board* board) {
 
 	}
 
-	//bishops
+
 	while (white_bishop_BB.getBits()) {
 		int sq = white_bishop_BB.pop();
 		Square thisSq = Square(sq);
@@ -492,7 +484,6 @@ int Eval::evaluate(Board* board) {
 
 	}
 
-	//rooks
 	while (white_rook_BB.getBits()) {
 		int sq = white_rook_BB.pop();
 		Square thisSq = Square(sq);
@@ -532,7 +523,6 @@ int Eval::evaluate(Board* board) {
 
 	}
 
-	//queens
 	while (white_queen_BB.getBits()) {
 		int sq = white_queen_BB.pop();
 		Square thisSq = Square(sq);
@@ -571,7 +561,6 @@ int Eval::evaluate(Board* board) {
 
 	}
 
-	//Kings
 	mg_score_white += mgKingTableWhite[whiteKing];
 	eg_score_white += egKingTableWhite[whiteKing];
 
@@ -584,32 +573,31 @@ int Eval::evaluate(Board* board) {
 	if (blackKing < 56)
 		mg_score_black -= 27;
 
-	
-	/* Weighted phase scores */
+	//mg and eg eval weighted
 	score -= (int)((white_mg * mg_score_black) + ((1 - white_mg) * eg_score_black));
 	score += (int)((black_mg * mg_score_white) + ((1 - black_mg) * eg_score_white));
 
-	/* Piece pair adjustments */
+	//Bishop pairs
 	if (white_bishop_BB.count() == 2)
 		score += (int)(10 * phase + 17 * (1 - phase));
 
 	if (black_bishop_BB.count() == 2)
 		score -= (int)(10 * phase + 17 * (1 - phase));
 
+	//Knight pair
 	if (white_knight_BB.count() == 2)
 		score -= (int)(10 * phase + 17 * (1 - phase));
 
 	if (black_knight_BB.count() == 2)
 		score += (int)(10 * phase + 17 * (1 - phase));
 
+	//rook pair
 	if (white_rook_BB.count() == 2)
 		score -= (int)(12 * phase);
 
 	if (black_rook_BB.count() == 2)
 		score += (int)(12 * phase);
 
-
-	/* Attack and defense scores */
 	int attack_score_white = attack_white_count > 1 ? (attack_white_count * attack_white_weight) +
 		(69 * attack_squares_white) -
 		(black_shield * 50) -
@@ -627,9 +615,7 @@ int Eval::evaluate(Board* board) {
 	if (attack_score_black > 0)
 		score -= attack_score_black * phase;
 
-
-	/* MATE SQUARE */
-	if (white_mg == 0 && white_rook_BB.count() == 0 && white_queen_BB.count() == 0 && (black_rook_BB.count() > 0 || black_queen_BB.count() > 0)) {
+	if (white_mg == 0 && board->pieces(PieceType::ROOK, Color::WHITE).count() == 0 && board->pieces(PieceType::QUEEN, Color::WHITE).count() == 0 && (board->pieces(PieceType::ROOK, Color::BLACK).count() > 0 || board->pieces(PieceType::QUEEN, Color::BLACK).count() > 0)) {
 
 		score += mateTableKing[whiteKing];
 
@@ -641,7 +627,7 @@ int Eval::evaluate(Board* board) {
 		score += (int)distance;
 	}
 
-	if (black_mg == 0 && black_rook_BB.count() == 0 && black_queen_BB == 0 && (white_rook_BB.count() > 0 || white_queen_BB.count() > 0)) {
+	if (black_mg == 0 && board->pieces(PieceType::ROOK, Color::BLACK).count() == 0 && board->pieces(PieceType::QUEEN, Color::BLACK).count() == 0 && (board->pieces(PieceType::ROOK, Color::WHITE).count() > 0 || board->pieces(PieceType::QUEEN, Color::WHITE).count() > 0)) {
 
 		score -= mateTableKing[blackKing];
 
@@ -653,15 +639,12 @@ int Eval::evaluate(Board* board) {
 		score -= (int)distance;
 	}
 
-	/* 50 MOVE DRAW CONSIDERATIONS */
 	if (white_mg < 0.10f || black_mg < 0.10f) {
 		//50 move draw reduction
 		int movesBeforeDraw = 100 - board->halfMoveClock();
 		score = (movesBeforeDraw * score) / 100;
 	}
 
-
-	/* NEGA-MAX adjustment for black */
 	if (board->sideToMove() == Color::BLACK)
 		score *= -1;
 
@@ -746,10 +729,14 @@ int Eval::PsqM(Board* board, Move m) {
 }
 
 bool Eval::onlyPawns(Board* board) {
-
-	Bitboard occ_pawn_king = board->pieces(PieceType::PAWN, Color::WHITE) | board->pieces(PieceType::PAWN, Color::BLACK) | board->pieces(PieceType::KING, Color::WHITE) | board->pieces(PieceType::KING, Color::BLACK);
-	Bitboard occ_all = board->us(Color::WHITE) | board->us(Color::BLACK);
-
-	return !(occ_all ^ occ_pawn_king);
-
+	return
+		(board->pieces(PieceType::KNIGHT, Color::WHITE).count()) +
+		(board->pieces(PieceType::BISHOP, Color::WHITE).count()) +
+		(board->pieces(PieceType::ROOK, Color::WHITE).count()) +
+		(board->pieces(PieceType::QUEEN, Color::WHITE).count()) +
+		(board->pieces(PieceType::KNIGHT, Color::BLACK).count()) +
+		(board->pieces(PieceType::BISHOP, Color::BLACK).count()) +
+		(board->pieces(PieceType::ROOK, Color::BLACK).count()) +
+		(board->pieces(PieceType::QUEEN, Color::BLACK).count())
+		== 0;
 }

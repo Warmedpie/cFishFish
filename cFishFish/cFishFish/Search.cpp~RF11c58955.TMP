@@ -14,6 +14,8 @@ int Search::PVS_ignore(int alpha, int beta, int depth, int ply_deep, std::vector
     if (winLossDraw < 1)
         return winLossDraw;
 
+    bool inCheck = board->inCheck();
+
     int alpha_orig = alpha;
 
     Move table_move = multipv[ignore.size()];
@@ -732,6 +734,17 @@ std::vector<ScoredMove> Search::orderAll(Move table, int depth, Move counter) {
         if (m == table)
             continue;
 
+        if (m == counter) {
+           int score = 35000;
+
+           ScoredMove sm;
+           sm.score = score;
+           sm.move = m;
+
+           orderedMoves.push_back(sm);
+
+        }
+
         int score = Eval::PsqM(board, m);
 
         if (board->at(m.to()) != Piece::NONE) {
@@ -764,10 +777,6 @@ std::vector<ScoredMove> Search::orderAll(Move table, int depth, Move counter) {
             }
             else if (depth > 1 && killer_move[depth - 1] == m) {
                 score += 3000;
-            }
-
-            else if (m == counter) {
-                score += 4000;
             }
 
             score += history_hueristic[m.from().index()][m.to().index()];
@@ -864,11 +873,7 @@ std::vector<ScoredMove> Search::orderQuiet(Move table, int depth, Move threat, M
             score += 3000;
         }
 
-        else if (m == threat) {
-            score += 4000;
-        }
-
-        else if (m == counter) {
+        if (m == threat) {
             score += 4000;
         }
 

@@ -4,7 +4,7 @@
 using namespace chess;
 
 enum nodeType : int {
-	EXACT = 0, ALL, CUT, NOTYPE
+	EXACT = 0, ALL, CUT, THREAT_PREVENTION, NOTYPE
 };
 
 struct entry {

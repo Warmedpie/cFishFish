@@ -2,7 +2,7 @@
 
 entry TranspositionTable::transposition_search(uint64_t h) {
 	if (this->transposition_table.count(h)) {
-		return { this->transposition_table[h] };
+		return this->transposition_table[h];
 	}
 	return { -1,NOTYPE,0,0 };
 }

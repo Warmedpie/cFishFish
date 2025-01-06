@@ -18,6 +18,7 @@ private:
 	int multiPv = 1;
 	bool debug = false;
 	Search search;
+	Move prev = 0;
 
 public:
 
@@ -126,6 +127,8 @@ public:
 								for (int q = ++i; q < arguments.size(); q++) {
 									Move m = uci::uciToMove(*board, arguments[q]);
 									board->makeMove(m);
+
+									prev = m;
 								}
 							}
 						}
@@ -145,6 +148,8 @@ public:
 								for (int q = ++i; q < arguments.size(); q++) {
 									Move m = uci::uciToMove(*board, arguments[q]);
 									board->makeMove(m);
+
+									prev = m;
 								}
 							}
 						}
@@ -242,7 +247,7 @@ public:
 						std::vector<Move> ignore = {};
 						int score = 0;
 						for (int multi = 0; multi < multiPv; multi++) {
-							score = search.PVS_ignore(-9999999, 9999999, i, 0, ignore);
+							score = search.PVS_ignore(-9999999, 9999999, i, 0, ignore, prev);
 
 							if (score == -312312 || score == 312312)
 								break;

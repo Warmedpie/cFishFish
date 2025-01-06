@@ -61,9 +61,9 @@ public:
 
 	}
 
-	int PVS_ignore(int alpha, int beta, int depth, int plydeep, std::vector<Move> ignore);
-	int PVS(int alpha, int beta, int depth, int plydeep);
-	int negamax(int alpha, int beta, int depth, int plydeep);
+	int PVS_ignore(int alpha, int beta, int depth, int plydeep, std::vector<Move> ignore, Move prev);
+	int PVS(int alpha, int beta, int depth, int plydeep, Move prev);
+	int negamax(int alpha, int beta, int depth, int plydeep, Move prev);
 	int qSearch(int alpha, int beta, int depth);
 
 	bool nodeTableBreak(entry node, int depth, int alpha, int beta);
@@ -71,9 +71,9 @@ public:
 	int mateScore(int plydeep);
 	bool hasLegalMoves();
 
-	std::vector<ScoredMove> orderAll(Move best, int depth);
-	std::vector<ScoredMove> orderCaptures(Move best);
-	std::vector<ScoredMove> orderQuiet(Move best, int depth);
+	std::vector<ScoredMove> orderAll(Move best, int depth, Move counter = 0);
+	std::vector<ScoredMove> orderCaptures(Move best, Move threat = 0);
+	std::vector<ScoredMove> orderQuiet(Move best, int depth, Move threat = 0, Move counter = 0);
 	std::vector<ScoredMove> orderChecks();
 
 	inline Move bestMove(int n) {
