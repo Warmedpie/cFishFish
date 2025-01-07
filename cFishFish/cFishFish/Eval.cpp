@@ -383,6 +383,82 @@ int Eval::evaluate(Board* board) {
 	white_pawn_BB = board->pieces(PieceType::PAWN, Color::WHITE);
 	black_pawn_BB = board->pieces(PieceType::PAWN, Color::BLACK);
 
+	//Pawn Structure
+	for (int i = 0; i < 8; i++) {
+		Bitboard file_white = white_pawn_BB & Bitboard(File(i));
+		Bitboard file_black = black_pawn_BB & Bitboard(File(i));
+
+		//doubled
+		if (file_white.count() >= 2) {
+			mg_score_white -= (file_white.count() - 1) * 3 * (black_pawns/8);
+			eg_score_white -= (file_white.count() - 1) * 8 * (black_pawns / 8);
+		}
+
+		if (file_black.count() == 2) {
+			mg_score_black -= (file_black.count() - 1) * 3 * (white_pawns / 8);
+			eg_score_black -= (file_black.count() - 1) * 8 * (white_pawns / 8);
+		}
+
+		//passed
+		if (file_white.count() == 0 && file_black.count() > 1) {
+			mg_score_black += 5 * (black_pawns / 8);
+			eg_score_black += 20 * (black_pawns / 8);
+		}
+
+		if (file_black.count() == 0 && file_white.count() > 1) {
+			mg_score_white += 5 * (white_pawns / 8);
+			eg_score_white += 20 * (white_pawns / 8);
+		}
+
+		//Isolated
+		if (i == 0) {
+			Bitboard adjacent_white = white_pawn_BB & Bitboard(File(i + 1));
+			Bitboard adjacent_black = black_pawn_BB & Bitboard(File(i + 1));
+
+			if (adjacent_white.count() == 0) {
+				mg_score_white -= 3 * (black_pawns / 8);
+				eg_score_white -= 9 * (black_pawns / 8);
+			}
+
+			if (adjacent_black.count() == 0) {
+				mg_score_black -= 3 * (white_pawns / 8);
+				eg_score_black -= 9 * (white_pawns / 8);
+			}
+		}
+
+		else if (i == 7) {
+			Bitboard adjacent_white = white_pawn_BB & Bitboard(File(i - 1));
+			Bitboard adjacent_black = black_pawn_BB & Bitboard(File(i - 1));
+
+			if (adjacent_white.count() == 0) {
+				mg_score_white -= 3 * (black_pawns / 8);
+				eg_score_white -= 9 * (black_pawns / 8);
+			}
+
+			if (adjacent_black.count() == 0) {
+				mg_score_black -= 3 * (white_pawns / 8);
+				eg_score_black -= 9 * (white_pawns / 8);
+			}
+
+		}
+
+		else {
+			Bitboard adjacent_white = (white_pawn_BB & Bitboard(File(i - 1))) | (white_pawn_BB & Bitboard(File(i + 1)));
+			Bitboard adjacent_black = (black_pawn_BB & Bitboard(File(i - 1))) | (black_pawn_BB & Bitboard(File(i + 1)));
+
+			if (adjacent_white.count() == 0) {
+				mg_score_white -= 3 * (black_pawns / 8);
+				eg_score_white -= 9 * (black_pawns / 8);
+			}
+
+			if (adjacent_black.count() == 0) {
+				mg_score_black -= 3 * (white_pawns / 8);
+				eg_score_black -= 9 * (white_pawns / 8);
+			}
+		}
+
+	}
+
 	//Knights
 	while (white_knight_BB.getBits()) {
 		int sq = white_knight_BB.pop();
