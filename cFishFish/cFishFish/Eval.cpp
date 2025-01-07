@@ -187,46 +187,90 @@ static int CENTER_MANHATTAN_DISTANCE[64] = {
 
 
 float Eval::whitePhase(Bitboard white_knight_BB, Bitboard white_bishop_BB, Bitboard white_rook_BB, Bitboard white_queen_BB) {
-	int whiteMaterial =
+	int white_material =
 		(white_knight_BB.count() * 3) +
 		(white_bishop_BB.count() * 3) +
 		(white_rook_BB.count() * 5) +
 		(white_queen_BB.count() * 9);
 
-	return std::max(0.0f, (((float)whiteMaterial - 10) / 21));
+	return std::max(0.0f, (((float)white_material - 10) / 21));
 }
 
 float Eval::blackPhase(Bitboard black_knight_BB, Bitboard black_bishop_BB, Bitboard black_rook_BB, Bitboard black_queen_BB) {
-	int blackMaterial =
+	int black_material =
 		(black_knight_BB.count() * 3) +
 		(black_bishop_BB.count() * 3) +
 		(black_rook_BB.count() * 5) +
 		(black_queen_BB.count() * 9);
 
-	return std::max(0.0f, (((float)blackMaterial - 10) / 21));
+	return std::max(0.0f, (((float)black_material - 10) / 21));
 }
 
-int Eval::winnable(Bitboard white_pawn_BB, Bitboard white_knight_BB, Bitboard white_bishop_BB, Bitboard white_rook_BB, Bitboard white_queen_BB, Bitboard black_pawn_BB, Bitboard black_knight_BB, Bitboard black_bishop_BB, Bitboard black_rook_BB, Bitboard black_queen_BB) {
-	if (white_pawn_BB.count() != 0 || black_pawn_BB.count() != 0)
-		return 1;
+bool Eval::winnable(Bitboard white_pawn_BB, Bitboard white_knight_BB, Bitboard white_bishop_BB, Bitboard white_rook_BB, Bitboard white_queen_BB, Bitboard black_pawn_BB, Bitboard black_knight_BB, Bitboard black_bishop_BB, Bitboard black_rook_BB, Bitboard black_queen_BB, Color c) {
+	if (c == Color::NONE) {
+		if (white_pawn_BB.count() != 0 || black_pawn_BB.count() != 0)
+			return true;
 
-	if (white_queen_BB.count() != 0 || black_queen_BB.count() != 0)
-		return 1;
+		if (white_queen_BB.count() != 0 || black_queen_BB.count() != 0)
+			return true;
 
-	if (white_rook_BB.count() != 0 || black_rook_BB.count() != 0)
-		return 1;
+		if (white_rook_BB.count() != 0 || black_rook_BB.count() != 0)
+			return true;
 
+		if (white_bishop_BB.count() >= 2 || black_bishop_BB.count() >= 2)
+			return true;
 
-	if (white_bishop_BB.count() >= 2 || black_bishop_BB.count() >= 2)
-		return 1;
+		if ((white_bishop_BB != 0 && white_knight_BB != 0) || (black_bishop_BB != 0 && black_knight_BB != 0))
+			return true;
 
-	if ((white_bishop_BB != 0 && white_knight_BB != 0) || (black_bishop_BB != 0 && black_knight_BB != 0))
-		return 1;
+		if (white_knight_BB.count() >= 3 || black_knight_BB.count() >= 3)
+			return true;
 
-	if (white_knight_BB.count() >= 3 || black_knight_BB.count() >= 3)
-		return 1;
+		return false;
+	}
+	if (c == Color::WHITE) {
+		if (white_pawn_BB.count() != 0)
+			return true;
 
-	return 0;
+		if (white_queen_BB.count() != 0)
+			return true;
+
+		if (white_rook_BB.count() != 0)
+			return true;
+
+		if (white_bishop_BB.count() >= 2)
+			return true;
+
+		if ((white_bishop_BB != 0 && white_knight_BB != 0))
+			return true;
+
+		if (white_knight_BB.count() >= 3)
+			return true;
+
+		return false;
+	}
+
+	if (c == Color::BLACK) {
+		if (black_pawn_BB.count() != 0)
+			return true;
+
+		if (black_queen_BB.count() != 0)
+			return true;
+
+		if (white_rook_BB.count() != 0)
+			return true;
+
+		if (black_bishop_BB.count() >= 2)
+			return true;
+
+		if ((black_bishop_BB != 0 && black_knight_BB != 0))
+			return true;
+
+		if (black_knight_BB.count() >= 3)
+			return true;
+
+		return false;
+	}
 }
 
 int Eval::pieceMobility(PieceType pt, Board* b, int sq) {
@@ -273,6 +317,21 @@ int Eval::evaluate(Board* board) {
 	Bitboard white_king_BB = board->pieces(PieceType::KING, Color::WHITE);
 	Bitboard black_king_BB = board->pieces(PieceType::KING, Color::BLACK);
 
+	//Simple material values
+	int white_material =
+		(white_pawn_BB.count()) +
+		(white_knight_BB.count() * 3) +
+		(white_bishop_BB.count() * 3) +
+		(white_rook_BB.count() * 5) +
+		(white_queen_BB.count() * 9);
+
+	int black_material =
+		(black_pawn_BB.count()) +
+		(black_knight_BB.count() * 3) +
+		(black_bishop_BB.count() * 3) +
+		(black_rook_BB.count() * 5) +
+		(black_queen_BB.count() * 9);
+
 	//Number of pawns each side has
 	int white_pawns = white_pawn_BB.count();
 	int black_pawns = black_pawn_BB.count();
@@ -286,8 +345,10 @@ int Eval::evaluate(Board* board) {
 
 	float phase = (white_mg + black_mg) / 2;
 
+	bool white_can_win = winnable(white_pawn_BB, white_knight_BB, white_bishop_BB, white_rook_BB, white_queen_BB, black_pawn_BB, black_knight_BB, black_bishop_BB, black_rook_BB, black_queen_BB, Color::WHITE);
+	bool black_can_win = winnable(white_pawn_BB, white_knight_BB, white_bishop_BB, white_rook_BB, white_queen_BB, black_pawn_BB, black_knight_BB, black_bishop_BB, black_rook_BB, black_queen_BB, Color::BLACK);
 	//Returns draws by insufficient material
-	if (phase == 0 && winnable(white_pawn_BB, white_knight_BB, white_bishop_BB, white_rook_BB, white_queen_BB, black_pawn_BB, black_knight_BB, black_bishop_BB, black_rook_BB, black_queen_BB) == 0)
+	if (!white_can_win && !black_can_win)
 		return 0;
 
 	//score
@@ -472,7 +533,9 @@ int Eval::evaluate(Board* board) {
 			mg_score_white -= 25;
 
 		//Mobility
-		score += (3 * (pieceMobility(PieceType::KNIGHT, board, sq) - 4));
+		int m = pieceMobility(PieceType::KNIGHT, board, sq);
+		mg_score_white += (4 * m) - 4;
+		eg_score_white += (4 * m) - 4;
 
 		int atkSq = (attacks::knight(thisSq) & black_ring).count();
 		if (atkSq) {
@@ -504,7 +567,9 @@ int Eval::evaluate(Board* board) {
 			mg_score_black -= 25;
 
 		//Mobility
-		score -= (3 * (pieceMobility(PieceType::KNIGHT, board, sq) - 4));
+		int m = pieceMobility(PieceType::KNIGHT, board, sq);
+		mg_score_black += (4 * m) - 4;
+		eg_score_black += (4 * m) - 4;
 
 		int atkSq = (attacks::knight(thisSq) & white_ring).count();
 		if (atkSq) {
@@ -538,7 +603,9 @@ int Eval::evaluate(Board* board) {
 			mg_score_white -= 25;
 
 		//Mobility
-		score += (2 * (pieceMobility(PieceType::BISHOP, board, sq) - 7));
+		int m = pieceMobility(PieceType::BISHOP, board, sq);
+		mg_score_white += (3 * m) - 7;
+		eg_score_white += (3 * m) - 7;
 
 		int atkSq = (attacks::bishop(thisSq, (black_bb | white_pawn_BB)) & black_ring).count();
 		if (atkSq) {
@@ -561,7 +628,10 @@ int Eval::evaluate(Board* board) {
 			mg_score_black -= 25;
 
 		//Mobility
-		score -= (2 * (pieceMobility(PieceType::BISHOP, board, sq) - 7));
+		int m = pieceMobility(PieceType::BISHOP, board, sq);
+		mg_score_black += (3 * m) - 7;
+		eg_score_black += (3 * m) - 7;
+
 
 		int atkSq = (attacks::bishop(thisSq, (white_bb | black_pawn_BB)) & white_ring).count();
 		if (atkSq) {
@@ -580,9 +650,16 @@ int Eval::evaluate(Board* board) {
 		mg_score_white += mgPieceValues[3] + rookTableWhite[sq] + rookAdj[white_pawns];
 		eg_score_white += egPieceValues[3] + rookTableWhite[sq] + rookAdj[white_pawns];
 
-		//Mobility
-		score += (2 * (pieceMobility(PieceType::ROOK, board, sq) - 7));
 
+		//Only give mobility points when rook isn't trapped
+		if (std::abs(File(whiteKing) - File(sq)) < 4 && Rank(whiteKing) == Rank(sq) && sq <= 7) {
+			if (CENTER_MANHATTAN_DISTANCE[whiteKing] > CENTER_MANHATTAN_DISTANCE[sq]) {
+				//Mobility
+				int m = pieceMobility(PieceType::ROOK, board, sq);
+				mg_score_white += (2 * m) - 7;
+				eg_score_white += (4 * m) - 7;
+			}
+		}
 
 		int atkSq = (attacks::rook(thisSq, (black_bb | white_pawn_BB)) & black_ring).count();
 		if (atkSq) {
@@ -600,8 +677,15 @@ int Eval::evaluate(Board* board) {
 		mg_score_black += mgPieceValues[3] + rookTableBlack[sq] + rookAdj[black_pawns];
 		eg_score_black += egPieceValues[3] + rookTableBlack[sq] + rookAdj[black_pawns];
 
-		//Mobility
-		score -= (2 * (pieceMobility(PieceType::ROOK, board, sq) - 7));
+		//Only give mobility points when rook isn't trapped
+		if (std::abs(File(blackKing) - File(sq)) < 4 && Rank(blackKing) == Rank(sq) && sq <= 7) {
+			if (CENTER_MANHATTAN_DISTANCE[blackKing] > CENTER_MANHATTAN_DISTANCE[sq]) {
+				//Mobility
+				int m = pieceMobility(PieceType::ROOK, board, sq);
+				mg_score_black += (2 * m) - 7;
+				eg_score_black += (4 * m) - 7;
+			}
+		}
 
 		int atkSq = (attacks::rook(thisSq, (white_bb | black_pawn_BB)) & white_ring).count();
 		if (atkSq) {
@@ -621,7 +705,9 @@ int Eval::evaluate(Board* board) {
 		eg_score_white += egPieceValues[4] + queenTable[sq];
 
 		//Mobility
-		score += (pieceMobility(PieceType::QUEEN, board, sq) - 14);
+		int m = pieceMobility(PieceType::QUEEN, board, sq);
+		mg_score_white += m - 14;
+		eg_score_white += (2 * m) - 14;
 
 		int atkSq = (attacks::queen(thisSq, (black_bb | white_pawn_BB)) & black_ring).count();
 		if (atkSq) {
@@ -640,7 +726,9 @@ int Eval::evaluate(Board* board) {
 		eg_score_black += egPieceValues[4] + queenTable[sq];
 
 		//Mobility
-		score -= (pieceMobility(PieceType::QUEEN, board, sq) - 14);
+		int m = pieceMobility(PieceType::QUEEN, board, sq);
+		mg_score_black += m - 14;
+		eg_score_black += (2 * m) - 14;
 
 		int atkSq = (attacks::queen(thisSq, (white_bb | black_pawn_BB)) & white_ring).count();
 		if (atkSq) {
@@ -709,28 +797,44 @@ int Eval::evaluate(Board* board) {
 
 
 	/* MATE SQUARE */
-	if (white_mg == 0 && white_rook_BB.count() == 0 && white_queen_BB.count() == 0 && (black_rook_BB.count() > 0 || black_queen_BB.count() > 0)) {
+	if (white_rook_BB.count() == 0 && white_queen_BB.count() == 0 && (black_rook_BB.count() > 0 || black_queen_BB.count() > 0 || black_bishop_BB.count() >= 2 || black_knight_BB.count() >= 3 || (black_bishop_BB.count() >= 1 && black_knight_BB.count() >= 1))) {
 
-		score += mateTableKing[whiteKing];
+		float scale = 1.0f;
+
+		if (white_bishop_BB.count() >= 1)
+			scale /= 0.5f;
+
+		if (white_knight_BB.count() >= 1)
+			scale /= 0.5f;
+
+		score += scale * mateTableKing[whiteKing];
 
 		Square whiteSq = Square(whiteKing);
 		Square blackSq = Square(blackKing);
 
 		double distance = std::pow((whiteSq.rank() - blackSq.rank()), 2) + std::pow((whiteSq.file() - blackSq.file()), 2);
 
-		score += (int)distance;
+		score += scale * (int)distance;
 	}
 
-	if (black_mg == 0 && black_rook_BB.count() == 0 && black_queen_BB == 0 && (white_rook_BB.count() > 0 || white_queen_BB.count() > 0)) {
+	if (black_rook_BB.count() == 0 && black_queen_BB == 0 && (white_rook_BB.count() > 0 || white_queen_BB.count() > 0 || white_bishop_BB.count() >= 2 || white_knight_BB.count() >= 3 || (white_bishop_BB.count() >= 1 && white_knight_BB.count() >= 1))) {
 
-		score -= mateTableKing[blackKing];
+		float scale = 1.0f;
+
+		if (black_bishop_BB.count() >= 1)
+			scale /= 0.5f;
+
+		if (black_knight_BB.count() >= 1)
+			scale /= 0.5f;
+
+		score -= mateTableKing[blackKing] * scale;
 
 		Square whiteSq = Square(whiteKing);
 		Square blackSq = Square(blackKing);
 
 		double distance = std::pow((whiteSq.rank() - blackSq.rank()), 2) + std::pow((whiteSq.file() - blackSq.file()), 2);
 
-		score -= (int)distance;
+		score -= (int)distance * scale;
 	}
 
 	/* 50 MOVE DRAW CONSIDERATIONS */
@@ -740,6 +844,29 @@ int Eval::evaluate(Board* board) {
 		score = (movesBeforeDraw * score) / 100;
 	}
 
+	/* Drawish-positions */
+	if (!white_can_win)
+		score = std::min(0, score);
+
+	if (!black_can_win)
+		score = std::max(0, score);
+
+	//Other likely draws
+	if (phase == 0.0f) {
+
+		//Minor vs rook + pawns or rook vs pawns
+		if (score > 0 && white_material - black_material <= 2)
+			score *= 0.15f;
+		if (score < 0 && black_material - white_material <= 2)
+			score *= 0.15f;
+
+		//Two rooks vs rook + minor or two minors vs minor
+		if (score > 0 && white_material - black_material == 3)
+			score *= 0.45;
+		if (score < 0 && black_material - white_material == 3)
+			score *= 0.45;
+
+	}
 
 	/* NEGA-MAX adjustment for black */
 	if (board->sideToMove() == Color::BLACK)

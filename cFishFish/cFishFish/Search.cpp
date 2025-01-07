@@ -139,11 +139,15 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
     //NULL MOVE PRUNE
     //DO NOT PRUNE IF IN CHECK
     //ONLY PRUNE IN NULL WINDOWS
-    if (std::abs(alpha - beta) == 1 && !inCheck && !Eval::onlyPawns(board)) {
-        int staticEval = Eval::evaluate(board);
+    if (node.type == CUT && std::abs(alpha - beta) == 1 && !inCheck && !Eval::onlyPawns(board)) {
+        int static_eval = Eval::evaluate(board);
         //DO NOT NULL PRUNE DRAWS, ONLY NULL PRUNE WHEN STATIC EVAL IS GREATER THAN OR EQUAL TO BETA
-        if (staticEval != 0 && staticEval >= beta + 100 && prev != 0) {
+        if (static_eval != 0 && static_eval >= beta && prev != 0) {
             int R = depth > 6 ? 4 : 3;
+
+            if (depth > 8 && static_eval - beta > 256) {
+                R += (static_eval - beta) / 256;
+            }
 
             board->makeNullMove();
             int s = -PVS(-beta, -beta + 1, depth - R - 1, 0, 0);
@@ -219,6 +223,10 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
                 //Search with a null window until alpha improves
                 score = -PVS(-alpha - 1, -alpha, depth - 1 - LMR, ply_deep + 1, move);
 
+                //LMR re-search
+                if (score > alpha && LMR > 1) {
+                    score = -PVS(-alpha - 1, -alpha, depth - 1, ply_deep + 1, move);
+                }
                 //re-search required
                 if (score > alpha && beta - alpha > 1) {
                     score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, move);
@@ -268,7 +276,10 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
                 else {
                     //Search with a null window until alpha improves
                     score = -PVS(-alpha - 1, -alpha, depth - 1 - LMR, ply_deep + 1, move);
-
+                    //LMR re-search
+                    if (score > alpha && LMR > 1) {
+                        score = -PVS(-alpha - 1, -alpha, depth - 1, ply_deep + 1, move);
+                    }
                     //re-search required
                     if (score > alpha && beta - alpha > 1) {
                         score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, move);
@@ -326,7 +337,10 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
                 else {
                     //Search with a null window until alpha improves
                     score = -PVS(-alpha - 1, -alpha, depth - 1 - LMR, ply_deep + 1, move);
-
+                    //LMR re-search
+                    if (score > alpha && LMR > 1) {
+                        score = -PVS(-alpha - 1, -alpha, depth - 1, ply_deep + 1, move);
+                    }
                     //re-search required
                     if (score > alpha && beta - alpha > 1) {
                         score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, move);
@@ -409,17 +423,17 @@ int Search::negamax(int alpha, int beta, int depth, int ply_deep, Move prev) {
     //We do not razor if we are in check.
     if (!board->inCheck()) {
         if (depth == 1) {
-            int staticEval = Eval::evaluate(board);
+            int static_eval = Eval::evaluate(board);
 
-            int value = staticEval + (82 * 2);
+            int value = static_eval + (82 * 2);
             if (value < alpha) {
                 return std::max(qSearch(alpha, beta, 5), value);
             }
         }
         if (depth == 2) {
-            int staticEval = Eval::evaluate(board);
+            int static_eval = Eval::evaluate(board);
 
-            int value = staticEval + (82 * 5);
+            int value = static_eval + (82 * 5);
             if (value < alpha) {
                 return std::max(qSearch(alpha, beta, 5), value);
             }

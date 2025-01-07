@@ -1,6 +1,9 @@
 ﻿  cFishFish.cpp
+C:\Users\Alden\OneDrive\Documents\GitHub\cFishFish\cFishFish\cFishFish\Book.h(19,13): warning C4244: 'argument': conversion from 'time_t' to 'unsigned int', possible loss of data
   Eval.cpp
+C:\Users\Alden\OneDrive\Documents\GitHub\cFishFish\cFishFish\cFishFish\Eval.cpp(705,31): warning C4244: '+=': conversion from 'float' to 'int', possible loss of data
+C:\Users\Alden\OneDrive\Documents\GitHub\cFishFish\cFishFish\cFishFish\Eval.cpp(708,31): warning C4244: '-=': conversion from 'float' to 'int', possible loss of data
   Search.cpp
   TranspositionTable.cpp
   Generating Code...
-  cFishFish.vcxproj -> C:\Users\Alden\source\repos\cFishFish\x64\Debug\cFishFish.exe
+  cFishFish.vcxproj -> C:\Users\Alden\OneDrive\Documents\GitHub\cFishFish\cFishFish\x64\Debug\cFishFish.exe
