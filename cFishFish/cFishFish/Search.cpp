@@ -16,76 +16,63 @@ int Search::PVS_ignore(int alpha, int beta, int depth, int ply_deep, std::vector
 
     int alpha_orig = alpha;
 
-    Move table_move = multipv[ignore.size()];
+    entry node = TT.transposition_search(board->zobrist());
+
+    Move multi_move = multipv[ignore.size()];
+    Move table_move = node.best;
     Move best_move = 0;
+
+    if (contains(ignore, table_move))
+        table_move = multipv[ignore.size()];
 
     int i = 0;
 
-    //Play the table move
-    if (table_move != 0 && !contains(ignore, table_move)) {
-        board->makeMove(table_move);
-        int score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, table_move);
-        board->unmakeMove(table_move);
+    //Play all other
+    Move counter_killer = TT.transposition_search((long)(prev.to().index() * 64 + prev.from().index())).best;
+
+    std::vector<ScoredMove> ordered_moves = orderAll(table_move, depth, counter_killer);
+
+    for (ScoredMove scoredMove : ordered_moves) {
+
+        Move move = scoredMove.move;
+
+        if (contains(ignore, move))
+            continue;
+
+        board->makeMove(move);
+
+        int score = 0;
+
+        if (i == 0) {
+            score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, move);
+        }
+        else {
+            //Search with a null window until alpha improves
+            score = -PVS(-alpha - 1, -alpha, depth - 1, ply_deep + 1, move);
+
+            //re-search required
+            if (score > alpha && beta - alpha > 1) {
+                score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, move);
+            }
+        }
+
+        board->unmakeMove(move);
 
         if (score > alpha) {
             alpha = score;
-            best_move = table_move;
+            best_move = move;
+
+            //Fail-hard beta cut-off
+            if (alpha >= beta) {
+                break;
+            }
+
         }
 
         i++;
 
     }
 
-    //Play all other
-    if (alpha < beta) {
-
-        Move counter_killer = TT.transposition_search((long)(prev.to().index() * 64 + prev.from().index())).best;
-
-        std::vector<ScoredMove> ordered_moves = orderAll(table_move, depth, counter_killer);
-
-        for (ScoredMove scoredMove : ordered_moves) {
-
-            Move move = scoredMove.move;
-
-            if (contains(ignore, move))
-                continue;
-
-            board->makeMove(move);
-
-            int score = 0;
-
-            if (i == 0) {
-                score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, move);
-            }
-            else {
-                //Search with a null window until alpha improves
-                score = -PVS(-alpha - 1, -alpha, depth - 1, ply_deep + 1, move);
-
-                //re-search required
-                if (score > alpha && beta - alpha > 1) {
-                    score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, move);
-                }
-            }
-
-            board->unmakeMove(move);
-
-            if (score > alpha) {
-                alpha = score;
-                best_move = move;
-
-                //Fail-hard beta cut-off
-                if (alpha >= beta) {
-                    break;
-                }
-
-            }
-
-            i++;
-
-        }
-
-
-    }
 
     nodeType type = EXACT;
 
@@ -742,9 +729,18 @@ std::vector<ScoredMove> Search::orderAll(Move table, int depth, Move counter) {
 
     for (Move m : moves) {
 
-        //Table PV move already tested
-        if (m == table)
+        //Table PV move not already tested in root func call
+        if (m == table) {
+
+            ScoredMove sm;
+            sm.score = 999999999;
+            sm.move = m;
+
+            orderedMoves.push_back(sm);
+
             continue;
+
+        }
 
         int score = Eval::PsqM(board, m);
 

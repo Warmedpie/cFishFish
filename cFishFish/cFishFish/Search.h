@@ -33,6 +33,10 @@ private:
 
 public:
 
+	inline void set_board(Board* b) {
+		this->board = b;
+	}
+
 	inline void setup(Board* b, int search_time) {
 		start_time = std::chrono::steady_clock::now();
 		this->search_time = search_time;

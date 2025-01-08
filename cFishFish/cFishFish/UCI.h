@@ -4,6 +4,7 @@
 #include "Search.h"
 #include "Book.h"
 #include "Eval.h"
+#include "TranspositionTable.h"
 
 #include <string>
 #include <regex>
@@ -20,6 +21,8 @@ private:
 	bool debug = false;
 	Search search;
 	Move prev = 0;
+
+	int last_depth = 0;
 
 public:
 
@@ -182,6 +185,19 @@ public:
 				continue;
 			}
 
+			if (argument == "ORDER") {
+
+				search.set_board(board);
+
+				Move best = search.bestMove(0);
+
+				std::vector<ScoredMove> moves = search.orderAll(best, last_depth, prev);
+
+				for (int i = 0; i < moves.size(); i++) {
+					std::cout << moves[i].move << ":" << moves[i].score << std::endl;
+				}
+			}
+
 
 			if (argument == "GO") {
 				int depth = 32;
@@ -280,6 +296,8 @@ public:
 								std::cout << "info multipv " << multi + 1 << " depth " << i << " score mate " << mate_score << " time " << search.time() << " nodes " << search.getNodes() << " nps " << search.nps() << " tbhits " << search.tb_hits() << " pv " << search.pv(multi) << std::endl;
 
 							ignore.push_back(best);
+
+							last_depth = i;
 						}
 
 						if (score == -312312 || score == 312312)
