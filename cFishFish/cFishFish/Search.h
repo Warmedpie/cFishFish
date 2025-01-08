@@ -141,4 +141,8 @@ public:
 		return false;
 	}
 
+	inline void table_size(int size) {
+		TT.set_table(size);
+	}
+
 };

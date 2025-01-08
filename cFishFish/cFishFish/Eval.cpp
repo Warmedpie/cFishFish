@@ -257,7 +257,7 @@ bool Eval::winnable(Bitboard white_pawn_BB, Bitboard white_knight_BB, Bitboard w
 		if (black_queen_BB.count() != 0)
 			return true;
 
-		if (white_rook_BB.count() != 0)
+		if (black_rook_BB.count() != 0)
 			return true;
 
 		if (black_bishop_BB.count() >= 2)

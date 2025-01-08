@@ -12,6 +12,7 @@ struct entry {
 	nodeType type;
 	Move best;
 	int score;
+	uint64_t hash;
 };
 
 class TranspositionTable {
@@ -19,6 +20,14 @@ class TranspositionTable {
 private:
 
 	std::unordered_map<uint64_t, entry> transposition_table;
+
+	entry no_hash = { -1, NOTYPE, 0, 0, 0 };
+
+	uint64_t table_byte_size = 128 * 1024 * 1024;
+	std::vector<entry> table;
+	uint64_t get_index(uint64_t key) {
+		return key % table.size();
+	}
 
 
 public:
@@ -28,6 +37,20 @@ public:
 
 	inline void clear() {
 		transposition_table.clear();
+
+		set_table(0);
+	}
+
+	void set_table(uint64_t bytes = 0) {
+		if (bytes > 0)
+			this->table_byte_size = bytes;
+
+		uint64_t length = table_byte_size / sizeof(entry);
+
+		table.clear();
+
+		for (int i = 0; i < length; i++)
+			table.push_back({ -1, NOTYPE, 0, 0, 0 });
 	}
 
 };

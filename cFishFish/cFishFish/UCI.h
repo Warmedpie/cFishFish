@@ -16,11 +16,16 @@ private:
 	Book book;
 
 	int multiPv = 1;
+	int hash_size = 128;
 	bool debug = false;
 	Search search;
 	Move prev = 0;
 
 public:
+
+	UCI() {
+		search.table_size(hash_size * 1024 * 1024);
+	}
 
 	inline void parse(std::string command) {
 
@@ -38,6 +43,7 @@ public:
 				std::cout << "id name cFishFish v1.0" << std::endl;
 				std::cout << "id author Warmedpie" << std::endl;
 				std::cout << "option name MultiPV type spin default 1 min 1 max 10" << std::endl;
+				std::cout << "option name Hash type spin min 2 max 4096 default 128" << std::endl;
 				std::cout << "uciok" << std::endl;
 
 				continue;
@@ -91,6 +97,15 @@ public:
 
 								if (multiPv < 1)
 									multiPv = 1;
+							}
+
+							if (arguments[i + 2] == "HASH" && arguments[i + 3] == "VALUE") {
+								hash_size = std::min(std::stoi(arguments[i + 4]), 4096);
+
+								if (hash_size < 2)
+									hash_size = 2;
+
+								search.table_size(hash_size * 1024 * 1024);
 							}
 						}
 					}
