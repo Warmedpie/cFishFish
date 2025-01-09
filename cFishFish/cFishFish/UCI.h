@@ -144,7 +144,16 @@ public:
 							if (arguments[++i] == "MOVES") {
 								for (int q = ++i; q < arguments.size(); q++) {
 									Move m = uci::uciToMove(*board, arguments[q]);
-									board->makeMove(m);
+
+									Movelist moves;
+									movegen::legalmoves(moves, *board);
+
+									if (contains(moves, m)) {
+										board->makeMove(m);
+									}
+									else {
+										std::cout << "info illegal!" << std::endl;
+									}
 
 									prev = m;
 								}
@@ -165,7 +174,16 @@ public:
 
 								for (int q = ++i; q < arguments.size(); q++) {
 									Move m = uci::uciToMove(*board, arguments[q]);
-									board->makeMove(m);
+
+									Movelist moves;
+									movegen::legalmoves(moves, *board);
+
+									if (contains(moves, m)) {
+										board->makeMove(m);
+									}
+									else {
+										std::cout << "info illegal!" << std::endl;
+									}
 
 									prev = m;
 								}
@@ -353,6 +371,15 @@ public:
 
 		return toReturn;
 
+	}
+
+	inline bool contains(Movelist legal, Move m) {
+		for (int i = 0; i < legal.size(); i++) {
+			if (m.from() == legal[i].from() && m.to() == legal[i].to())
+				return true;
+		}
+
+		return false;
 	}
 
 };
