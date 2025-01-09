@@ -385,73 +385,14 @@ int Eval::evaluate(Board* board) {
 
 	/* PIECE AND PIECE SQUARES */
 
-	//Pawns
-	while (white_pawn_BB.getBits()) {
-		int sq = white_pawn_BB.pop();
-
-		mg_score_white += mgPieceValues[0] + mgPawnTableWhite[sq];
-		eg_score_white += egPieceValues[0] + egPawnTableWhite[sq];
-
-		//Pawn shield
-		if (white_ring.check(sq) && whiteKing < 8)
-			white_shield++;
-
-		if (white_ring.check(sq) && whiteKing >= 8)
-			white_shield--;
-
-		//Space
-		if ((sq + 8 <= 63) && board->at(Square(sq + 8)) != Piece::WHITEPAWN) {
-			score += 2;
-			if ((sq + 16 <= 63) && board->at(Square(sq + 16)) != Piece::WHITEPAWN) {
-				score += 2;
-			}
-		}
-
-		//Center control
-		if (CENTER_MANHATTAN_DISTANCE[sq] <= 1)
-			mg_score_white += 4;
-
-	}
-
-	while (black_pawn_BB.getBits()) {
-		int sq = black_pawn_BB.pop();
-
-		mg_score_black += mgPieceValues[0] + mgPawnTableBlack[sq];
-		eg_score_black += egPieceValues[0] + egPawnTableBlack[sq];
-
-		//Pawn shield on first
-		if (black_ring.check(sq) && blackKing > 55)
-			black_shield++;
-
-		if (black_ring.check(sq) && blackKing <= 55)
-			black_shield--;
-
-		//Space
-		if ((sq - 8 > 0) && board->at(Square(sq - 8)) != Piece::BLACKPAWN) {
-			score -= 2;
-			if ((sq - 16 > 0) && board->at(Square(sq - 16)) != Piece::BLACKPAWN) {
-				score -= 2;
-			}
-		}
-
-		//Center control
-		if (CENTER_MANHATTAN_DISTANCE[sq] <= 1)
-			mg_score_black += 4;
-
-	}
-
-	//Re-init pawn bitboards for other pieces to use.
-	white_pawn_BB = board->pieces(PieceType::PAWN, Color::WHITE);
-	black_pawn_BB = board->pieces(PieceType::PAWN, Color::BLACK);
-
-	//Pawn Structure
+		//Pawn Structure
 	for (int i = 0; i < 8; i++) {
 		Bitboard file_white = white_pawn_BB & Bitboard(File(i));
 		Bitboard file_black = black_pawn_BB & Bitboard(File(i));
 
 		//doubled
 		if (file_white.count() >= 2) {
-			mg_score_white -= (file_white.count() - 1) * 3 * (black_pawns/8);
+			mg_score_white -= (file_white.count() - 1) * 3 * (black_pawns / 8);
 			eg_score_white -= (file_white.count() - 1) * 8 * (black_pawns / 8);
 		}
 
@@ -752,6 +693,60 @@ int Eval::evaluate(Board* board) {
 	if (blackKing < 56)
 		mg_score_black -= 27;
 
+	//Pawns
+	while (white_pawn_BB.getBits()) {
+		int sq = white_pawn_BB.pop();
+
+		mg_score_white += mgPieceValues[0] + mgPawnTableWhite[sq];
+		eg_score_white += egPieceValues[0] + egPawnTableWhite[sq];
+
+		//Pawn shield
+		if (white_ring.check(sq) && whiteKing < 8)
+			white_shield++;
+
+		if (white_ring.check(sq) && whiteKing >= 8)
+			white_shield--;
+
+		//Space
+		if ((sq + 8 <= 63) && board->at(Square(sq + 8)) != Piece::WHITEPAWN) {
+			score += 2;
+			if ((sq + 16 <= 63) && board->at(Square(sq + 16)) != Piece::WHITEPAWN) {
+				score += 2;
+			}
+		}
+
+		//Center control
+		if (CENTER_MANHATTAN_DISTANCE[sq] <= 1)
+			mg_score_white += 4;
+
+	}
+
+	while (black_pawn_BB.getBits()) {
+		int sq = black_pawn_BB.pop();
+
+		mg_score_black += mgPieceValues[0] + mgPawnTableBlack[sq];
+		eg_score_black += egPieceValues[0] + egPawnTableBlack[sq];
+
+		//Pawn shield on first
+		if (black_ring.check(sq) && blackKing > 55)
+			black_shield++;
+
+		if (black_ring.check(sq) && blackKing <= 55)
+			black_shield--;
+
+		//Space
+		if ((sq - 8 > 0) && board->at(Square(sq - 8)) != Piece::BLACKPAWN) {
+			score -= 2;
+			if ((sq - 16 > 0) && board->at(Square(sq - 16)) != Piece::BLACKPAWN) {
+				score -= 2;
+			}
+		}
+
+		//Center control
+		if (CENTER_MANHATTAN_DISTANCE[sq] <= 1)
+			mg_score_black += 4;
+
+	}
 	
 	/* Weighted phase scores */
 	score -= (int)((white_mg * mg_score_black) + ((1 - white_mg) * eg_score_black));
@@ -854,17 +849,32 @@ int Eval::evaluate(Board* board) {
 	//Other likely draws
 	if (phase == 0.0f) {
 
-		//Minor vs rook + pawns or rook vs pawns
-		if (score > 0 && white_material - black_material <= 2)
-			score *= 0.15f;
-		if (score < 0 && black_material - white_material <= 2)
-			score *= 0.15f;
+		if (white_pawns == black_pawns && white_pawns < 3 && black_pawns < 3) {
+			//Minor vs rook + pawns or rook vs pawns
+			if (score > 0 && white_material - black_material <= 2)
+				score *= 0.15f;
+			if (score < 0 && black_material - white_material <= 2)
+				score *= 0.15f;
 
-		//Two rooks vs rook + minor or two minors vs minor
-		if (score > 0 && white_material - black_material == 3)
-			score *= 0.45;
-		if (score < 0 && black_material - white_material == 3)
-			score *= 0.45;
+			//Two rooks vs rook + minor or two minors vs minor
+			if (score > 0 && white_material - black_material == 3)
+				score *= 0.45;
+			if (score < 0 && black_material - white_material == 3)
+				score *= 0.45;
+		}
+
+		else {
+			if (score > 0 && white_material - black_material <= 2)
+				score *= 0.55f;
+			if (score < 0 && black_material - white_material <= 2)
+				score *= 0.55f;
+
+			//Two rooks vs rook + minor or two minors vs minor
+			if (score > 0 && white_material - black_material == 3)
+				score *= 0.85;
+			if (score < 0 && black_material - white_material == 3)
+				score *= 0.85;
+		}
 
 	}
 
