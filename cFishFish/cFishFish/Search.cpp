@@ -193,14 +193,15 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
             //Late move reductions
             //Do not reduce when in check
             //do not reduce moves that are checks
+
             int LMR = 0;
             if (!inCheck && !board->inCheck()) {
-                LMR = (int)(0.3 + std::log(depth) * std::log(i) / 3.35);
-            }
-
-            //Equal value captures
-            if (scoredMove.score < 10000) {
-                LMR = (int)(0.5 + std::log(depth) * std::log(i) / 2.9);
+                //Equal value captures
+                if (scoredMove.score < 10000) {
+                    LMR = (int)(0.5 + std::log(depth) * std::log(i) / 2.9);
+                }
+                //Winning Captures
+                else LMR = (int)(0.3 + std::log(depth) * std::log(i) / 3.35);
             }
 
             if (i == 0) {
