@@ -273,29 +273,6 @@ bool Eval::winnable(Bitboard white_pawn_BB, Bitboard white_knight_BB, Bitboard w
 	}
 }
 
-int Eval::pieceMobility(PieceType pt, Board* b, int sq) {
-	Bitboard occ_white = b->us(Color::WHITE);
-	Bitboard occ_black = b->us(Color::BLACK);
-
-	Bitboard occ_all = (occ_black | occ_white);
-
-	switch (pt)
-	{
-	case 1:
-		return (attacks::knight(Square(sq)) & ~occ_all).count();
-	case 2:
-		return (attacks::bishop(Square(sq), occ_all) & ~occ_all).count();
-	case 3:
-		return (attacks::rook(Square(sq), occ_all) & ~occ_all).count();
-	case 4:
-		return (attacks::queen(Square(sq), occ_all) & ~occ_all).count();
-	default:
-		break;
-	}
-
-	return 0;
-}
-
 int Eval::evaluate(Board* board) {
 
 	//Pieces
@@ -336,6 +313,9 @@ int Eval::evaluate(Board* board) {
 	int white_pawns = white_pawn_BB.count();
 	int black_pawns = black_pawn_BB.count();
 
+	int white_queens = white_queen_BB.count();
+	int black_queens = black_queen_BB.count();
+
 	int whiteKing = white_king_BB.lsb();
 	int blackKing = black_king_BB.lsb();
 
@@ -361,6 +341,10 @@ int Eval::evaluate(Board* board) {
 	int eg_score_white = 0;
 	int eg_score_black = 0;
 
+	//Mobility scores (we only really need these values for king safety in the middle game)
+	int mg_mobility_white = 0;
+	int mg_mobility_black = 0;
+
 	//Attackers
 	int attack_white_count = 0;
 	int attack_black_count = 0;
@@ -377,18 +361,30 @@ int Eval::evaluate(Board* board) {
 	int white_shield = 0;
 	int black_shield = 0;
 
-	Bitboard white_ring = kingRing(whiteKing) | white_king_BB;
-	Bitboard black_ring = kingRing(blackKing) | black_king_BB;
+	int weak_white = 0;
+	int weak_black = 0;
+
+	Bitboard white_ring = kingRing(whiteKing);
+	Bitboard black_ring = kingRing(blackKing);
 	Bitboard white_bb = white_pawn_BB | white_knight_BB | white_bishop_BB | white_rook_BB | white_queen_BB;
 	Bitboard black_bb = black_pawn_BB | black_knight_BB | black_bishop_BB | black_rook_BB | black_queen_BB;
 
+	Bitboard white_vison;
+	Bitboard black_vison;
 
 	/* PIECE AND PIECE SQUARES */
 
 		//Pawn Structure
 	for (int i = 0; i < 8; i++) {
-		Bitboard file_white = white_pawn_BB & Bitboard(File(i));
-		Bitboard file_black = black_pawn_BB & Bitboard(File(i));
+
+		Bitboard file_BB = Bitboard(File(i));
+		Bitboard adj_left_file_BB = 0;
+		Bitboard adj_right_file_BB = 0;
+
+		if (i > 0) adj_left_file_BB = Bitboard(File(i - 1));
+		if (i < 7) adj_right_file_BB = Bitboard(File(i + 1));
+		Bitboard file_white = white_pawn_BB & file_BB;
+		Bitboard file_black = black_pawn_BB & file_BB;
 
 		//doubled
 		if (file_white.count() >= 2) {
@@ -414,8 +410,8 @@ int Eval::evaluate(Board* board) {
 
 		//Isolated
 		if (i == 0) {
-			Bitboard adjacent_white = white_pawn_BB & Bitboard(File(i + 1));
-			Bitboard adjacent_black = black_pawn_BB & Bitboard(File(i + 1));
+			Bitboard adjacent_white = white_pawn_BB & adj_right_file_BB;
+			Bitboard adjacent_black = black_pawn_BB & adj_right_file_BB;
 
 			if (adjacent_white.count() == 0) {
 				mg_score_white -= 3 * (black_pawns / 8);
@@ -429,8 +425,8 @@ int Eval::evaluate(Board* board) {
 		}
 
 		else if (i == 7) {
-			Bitboard adjacent_white = white_pawn_BB & Bitboard(File(i - 1));
-			Bitboard adjacent_black = black_pawn_BB & Bitboard(File(i - 1));
+			Bitboard adjacent_white = white_pawn_BB & adj_left_file_BB;
+			Bitboard adjacent_black = black_pawn_BB & adj_left_file_BB;
 
 			if (adjacent_white.count() == 0) {
 				mg_score_white -= 3 * (black_pawns / 8);
@@ -445,8 +441,8 @@ int Eval::evaluate(Board* board) {
 		}
 
 		else {
-			Bitboard adjacent_white = (white_pawn_BB & Bitboard(File(i - 1))) | (white_pawn_BB & Bitboard(File(i + 1)));
-			Bitboard adjacent_black = (black_pawn_BB & Bitboard(File(i - 1))) | (black_pawn_BB & Bitboard(File(i + 1)));
+			Bitboard adjacent_white = (white_pawn_BB & adj_left_file_BB | (white_pawn_BB & adj_right_file_BB));
+			Bitboard adjacent_black = (black_pawn_BB & adj_left_file_BB | (black_pawn_BB & adj_right_file_BB));
 
 			if (adjacent_white.count() == 0) {
 				mg_score_white -= 3 * (black_pawns / 8);
@@ -474,21 +470,26 @@ int Eval::evaluate(Board* board) {
 			mg_score_white -= 25;
 
 		//Mobility
-		int m = pieceMobility(PieceType::KNIGHT, board, sq);
-		mg_score_white += (4 * m) - 4;
+
+		Bitboard attacks = attacks::knight(thisSq);
+		int m = attacks.count();
+
+		mg_mobility_white += (4 * m) - 4;
 		eg_score_white += (4 * m) - 4;
 
-		int atkSq = (attacks::knight(thisSq) & black_ring).count();
+		int atkSq = (attacks & black_ring).count();
 		if (atkSq) {
 			attack_white_count++;
 			attack_white_weight += 81;
 			attack_squares_white += atkSq;
 		}
 
-		int defSq = (attacks::knight(thisSq) & white_ring).count();
+		int defSq = (attacks & white_ring).count();
 		if (defSq) {
 			defender_white_knight += defSq;
 		}
+
+		white_vison |= attacks;
 
 		//Center control
 		if (CENTER_MANHATTAN_DISTANCE[sq] <= 2)
@@ -508,22 +509,25 @@ int Eval::evaluate(Board* board) {
 			mg_score_black -= 25;
 
 		//Mobility
-		int m = pieceMobility(PieceType::KNIGHT, board, sq);
-		mg_score_black += (4 * m) - 4;
+		Bitboard attacks = attacks::knight(thisSq);
+		int m = attacks.count();
+
+		mg_mobility_black += (4 * m) - 4;
 		eg_score_black += (4 * m) - 4;
 
-		int atkSq = (attacks::knight(thisSq) & white_ring).count();
+		int atkSq = (attacks & white_ring).count();
 		if (atkSq) {
 			attack_black_count++;
 			attack_black_weight += 81;
 			attack_squares_black += atkSq;
 		}
 
-		int defSq = (attacks::knight(thisSq) & black_ring).count();
+		int defSq = (attacks & black_ring).count();
 		if (defSq) {
 			defender_black_knight += defSq;
 		}
 
+		black_vison |= attacks;
 
 		//Center control
 		if (CENTER_MANHATTAN_DISTANCE[sq] <= 2)
@@ -544,8 +548,10 @@ int Eval::evaluate(Board* board) {
 			mg_score_white -= 25;
 
 		//Mobility
-		int m = pieceMobility(PieceType::BISHOP, board, sq);
-		mg_score_white += (3 * m) - 7;
+		Bitboard attacks = attacks::bishop(thisSq, ~white_bb);
+		int m = attacks.count();
+
+		mg_mobility_white += (3 * m) - 7;
 		eg_score_white += (3 * m) - 7;
 
 		int atkSq = (attacks::bishop(thisSq, (black_bb | white_pawn_BB)) & black_ring).count();
@@ -554,6 +560,8 @@ int Eval::evaluate(Board* board) {
 			attack_white_weight += 52;
 			attack_squares_white += atkSq;
 		}
+
+		white_vison |= attacks;
 
 	}
 
@@ -569,17 +577,21 @@ int Eval::evaluate(Board* board) {
 			mg_score_black -= 25;
 
 		//Mobility
-		int m = pieceMobility(PieceType::BISHOP, board, sq);
-		mg_score_black += (3 * m) - 7;
+		Bitboard attacks = attacks::bishop(thisSq, ~black_bb);
+		int m = attacks.count();
+
+		mg_mobility_black += (3 * m) - 7;
 		eg_score_black += (3 * m) - 7;
 
 
-		int atkSq = (attacks::bishop(thisSq, (white_bb | black_pawn_BB)) & white_ring).count();
+		int atkSq = (attacks::queen(thisSq, (white_bb | black_pawn_BB)) & white_ring).count();
 		if (atkSq) {
 			attack_black_count++;
 			attack_black_weight += 52;
 			attack_squares_black += atkSq;
 		}
+
+		black_vison |= attacks;
 
 	}
 
@@ -591,13 +603,15 @@ int Eval::evaluate(Board* board) {
 		mg_score_white += mgPieceValues[3] + rookTableWhite[sq] + rookAdj[white_pawns];
 		eg_score_white += egPieceValues[3] + rookTableWhite[sq] + rookAdj[white_pawns];
 
+		Bitboard attacks = attacks::rook(thisSq, ~white_bb);
+
 
 		//Only give mobility points when rook isn't trapped
 		if (std::abs(File(whiteKing) - File(sq)) < 4 && Rank(whiteKing) == Rank(sq) && sq <= 7) {
 			if (CENTER_MANHATTAN_DISTANCE[whiteKing] > CENTER_MANHATTAN_DISTANCE[sq]) {
 				//Mobility
-				int m = pieceMobility(PieceType::ROOK, board, sq);
-				mg_score_white += (2 * m) - 7;
+				int m = attacks.count();
+				mg_mobility_white += (2 * m) - 7;
 				eg_score_white += (4 * m) - 7;
 			}
 		}
@@ -609,6 +623,8 @@ int Eval::evaluate(Board* board) {
 			attack_squares_white += atkSq;
 		}
 
+		white_vison |= attacks;
+
 	}
 
 	while (black_rook_BB.getBits()) {
@@ -618,12 +634,14 @@ int Eval::evaluate(Board* board) {
 		mg_score_black += mgPieceValues[3] + rookTableBlack[sq] + rookAdj[black_pawns];
 		eg_score_black += egPieceValues[3] + rookTableBlack[sq] + rookAdj[black_pawns];
 
+		Bitboard attacks = attacks::rook(thisSq, ~black_bb);
+
 		//Only give mobility points when rook isn't trapped
 		if (std::abs(File(blackKing) - File(sq)) < 4 && Rank(blackKing) == Rank(sq) && sq <= 7) {
 			if (CENTER_MANHATTAN_DISTANCE[blackKing] > CENTER_MANHATTAN_DISTANCE[sq]) {
 				//Mobility
-				int m = pieceMobility(PieceType::ROOK, board, sq);
-				mg_score_black += (2 * m) - 7;
+				int m = attacks.count();
+				mg_mobility_black += (2 * m) - 7;
 				eg_score_black += (4 * m) - 7;
 			}
 		}
@@ -646,8 +664,10 @@ int Eval::evaluate(Board* board) {
 		eg_score_white += egPieceValues[4] + queenTable[sq];
 
 		//Mobility
-		int m = pieceMobility(PieceType::QUEEN, board, sq);
-		mg_score_white += m - 14;
+		Bitboard attacks = attacks::queen(thisSq, ~white_bb);
+		int m = attacks.count();
+
+		mg_mobility_white += m - 14;
 		eg_score_white += (2 * m) - 14;
 
 		int atkSq = (attacks::queen(thisSq, (black_bb | white_pawn_BB)) & black_ring).count();
@@ -656,6 +676,8 @@ int Eval::evaluate(Board* board) {
 			attack_white_weight += 30;
 			attack_squares_white += atkSq;
 		}
+
+		white_vison |= attacks;
 
 	}
 
@@ -667,8 +689,10 @@ int Eval::evaluate(Board* board) {
 		eg_score_black += egPieceValues[4] + queenTable[sq];
 
 		//Mobility
-		int m = pieceMobility(PieceType::QUEEN, board, sq);
-		mg_score_black += m - 14;
+		Bitboard attacks = attacks::queen(thisSq, ~black_bb);
+		int m = attacks.count();
+
+		mg_mobility_black += m - 14;
 		eg_score_black += (2 * m) - 14;
 
 		int atkSq = (attacks::queen(thisSq, (white_bb | black_pawn_BB)) & white_ring).count();
@@ -677,6 +701,8 @@ int Eval::evaluate(Board* board) {
 			attack_black_weight += 30;
 			attack_squares_black += atkSq;
 		}
+
+		black_vison |= attacks;
 
 	}
 
@@ -719,6 +745,9 @@ int Eval::evaluate(Board* board) {
 		if (CENTER_MANHATTAN_DISTANCE[sq] <= 1)
 			mg_score_white += 4;
 
+		Square thisSq = Square(sq);
+		white_vison |= attacks::pawn(Color::WHITE, thisSq);
+
 	}
 
 	while (black_pawn_BB.getBits()) {
@@ -746,7 +775,13 @@ int Eval::evaluate(Board* board) {
 		if (CENTER_MANHATTAN_DISTANCE[sq] <= 1)
 			mg_score_black += 4;
 
+		Square thisSq = Square(sq);
+		black_vison |= attacks::pawn(Color::BLACK, thisSq);
+
 	}
+
+	mg_score_white += mg_mobility_white;
+	mg_score_black += mg_mobility_black;
 	
 	/* Weighted phase scores */
 	score -= (int)((white_mg * mg_score_black) + ((1 - white_mg) * eg_score_black));
@@ -771,23 +806,46 @@ int Eval::evaluate(Board* board) {
 	if (black_rook_BB.count() == 2)
 		score += (int)(12 * phase);
 
+	weak_white = ((black_vison & white_ring) & ~white_vison).count();
+	weak_black = ((white_vison & black_ring) & ~black_vison).count();
 
 	/* Attack and defense scores */
-	int attack_score_white = attack_white_count > 1 ? (attack_white_count * attack_white_weight) +
-		(69 * attack_squares_white) -
+	int attack_score_white = attack_white_count > 1 ? 
+		//More attackers + bigger attackers
+		(attack_white_count * attack_white_weight) +
+		//Squares we are attacking near king
+		(69 * attack_squares_white) +
+		//Squares with only a king defender in the king ring
+		(90 * weak_black) -
+		//Score of pawns covering the king
 		(black_shield * 50) -
+		//Using a knight to defend the king
 		(defender_black_knight * 45) : 0;
 
+	//Mate is less likely without a queen
+	if (white_queens == 0)
+		attack_score_white /= 2;
 
-	int attack_score_black = attack_black_count > 1 ? (attack_black_count * attack_black_weight) +
-		(69 * attack_squares_black) -
+	int attack_score_black = attack_black_count > 1 ?
+		//More attackers + bigger attackers
+		(attack_black_count * attack_black_weight) +
+		//Squares we are attacking near king
+		(69 * attack_squares_black) +
+		//Squares with only a king defender in the king ring
+		(90 * weak_white) -
+		//Score of pawns covering the king
 		(white_shield * 50) -
+		//Using a knight to defend the king
 		(defender_white_knight * 45) : 0;
 
-	if (attack_score_white > 0)
+	//Mate is less likely without a queen
+	if (black_queens == 0)
+		attack_score_black /= 2;
+
+	if (attack_score_white)
 		score += attack_score_white * phase;
 
-	if (attack_score_black > 0)
+	if (attack_score_black)
 		score -= attack_score_black * phase;
 
 
@@ -887,7 +945,22 @@ int Eval::evaluate(Board* board) {
 }
 
 Bitboard Eval::kingRing(int king_sq) {
+
 	return attacks::king(king_sq);
+}
+
+bool Eval::isAttacked(Board* b, Square square, Color color) {
+	// cheap checks first
+	if (attacks::pawn(~color, square) & b->pieces(PieceType::PAWN, color)) return true;
+	if (attacks::knight(square) & b->pieces(PieceType::KNIGHT, color)) return true;
+
+	if (attacks::bishop(square, b->occ()) & (b->pieces(PieceType::BISHOP, color) | b->pieces(PieceType::QUEEN, color)))
+		return true;
+
+	if (attacks::rook(square, b->occ()) & (b->pieces(PieceType::ROOK, color) | b->pieces(PieceType::QUEEN, color)))
+		return true;
+
+	return false;
 }
 
 int Eval::PsqM(Board* board, Move m) {

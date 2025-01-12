@@ -38,9 +38,7 @@ public:
 	inline void clear() {
 		transposition_table.clear();
 
-		for (int i = 0; i < table.size(); i++)
-			if (table[i].depth != -1)
-				table[i].depth = 0;
+		set_table(table_byte_size);
 	}
 
 	void set_table(uint64_t bytes = 0) {
