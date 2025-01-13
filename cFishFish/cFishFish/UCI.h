@@ -153,6 +153,7 @@ public:
 									}
 									else {
 										std::cout << "info illegal!" << std::endl;
+										return;
 									}
 
 									prev = m;
@@ -183,6 +184,7 @@ public:
 									}
 									else {
 										std::cout << "info illegal!" << std::endl;
+										return;
 									}
 
 									prev = m;
@@ -193,6 +195,8 @@ public:
 					}
 
 				}
+
+				std::cout << "info ok!" << std::endl;
 
 				continue;
 			}
