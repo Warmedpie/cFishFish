@@ -23,7 +23,7 @@ int Search::PVS_ignore(int alpha, int beta, int depth, int ply_deep, std::vector
     Move best_move = 0;
 
     if (contains(ignore, table_move))
-        table_move = multipv[ignore.size()];
+        table_move = multi_move;
 
     int i = 0;
 
@@ -87,7 +87,8 @@ int Search::PVS_ignore(int alpha, int beta, int depth, int ply_deep, std::vector
 
     entry insert_node = { depth, type, best_move, alpha };
 
-    TT.transposition_entry(board->zobrist(), insert_node);
+    if (ignore.size() == 0)
+        TT.transposition_entry(board->zobrist(), insert_node);
 
     multipv[ignore.size()] = best_move;
 

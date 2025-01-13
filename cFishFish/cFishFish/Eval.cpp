@@ -5,165 +5,303 @@ static int mgPieceValues[5] = { 82, 337, 365, 477, 1025 };
 static int egPieceValues[5] = { 101, 300, 319, 550, 1005 };
 
 //Adjustment values by pawn count for knights and bishops
-static int knightAdj[9] = { -20, -16, -12, -8, -4,  0,  4,  8, 12 };
-static int rookAdj[9] = { 15,  12,   9,  6,  3,  0, -3, -6, -9 };
+static const int knightAdj[9] = { -20, -16, -12, -8, -4,  0,  4,  8, 12 };
+static const int rookAdj[9] = { 15,  12,   9,  6,  3,  0, -3, -6, -9 };
+
+//COLOR PHASE PIECE TYPE SQUARE
+static const int PSQT[2][2][6][64] = {
+
+	//WHITE TABLES
+	{
+		//MG TABLES
+		{
+			//PAWN
+			{
+				 0, 0, 0, 0, 0, 0, 0, 0,
+				-35, -1, -20, -23, -15, 24, 38, -22,
+				-26, -4, -4, -10, 3, 3, 33, -12,
+				-27, -2, -5, 12, 17, 6, 10, -25,
+				-14, 13, 6, 21, 23, 12, 17, -23,
+				-6, 7, 26, 31, 65, 56, 25, -20,
+				98, 134, 61, 95, 68, 126, 34, -11,
+				0, 0, 0, 0, 0, 0, 0, 0,
+			},
+
+			//KNIGHT
+			{
+				-50, -40, -30, -30, -30, -30, -40, -50,
+				-40, -20, 0, 0, 0, 0, -20, -40,
+				-30, 0, 10, 15, 15, 10, 0, -30,
+				-30, 5, 15, 20, 20, 15, 5, -30,
+				-30, 5, 15, 20, 20, 15, 5, -30,
+				-30, 0, 10, 15, 15, 10, 0, -30,
+				-40, -20, 0, 0, 0, 0, -20, -40,
+				-50, -40, -30, -30, -30, -30, -40, -50
+			},
+			//BISHOP
+			{
+				-33, -3, -14, -21, -13, -12, -39, -21,
+				4, 15, 16, 0, 7, 21, 33, 1,
+				0, 15, 15, 4, 3, 27, 18, 10,
+				-6, 13, 13, 26, 34, 12, 10, 4,
+				-4, 5, 19, 50, 37, 37, 7, -2,
+				-16, 37, 43, 40, 35, 50, 37, -2,
+				-26, 16, -18, -13, 30, 59, 18, -47,
+				-29, 4, -82, -37, -25, -42, 7, -8,
+			},
+			//ROOK
+			{
+				-19, -13, 1, 17, 16, 7, -37, -26,
+				-44, -16, -20, -9, -1, 11, -6, -71,
+				-45, -25, -16, -17, 3, 0, -5, -33,
+				-36, -26, -12, -1, 9, -7, 6, -23,
+				-24, -11, 7, 26, 24, 35, -8, -20,
+				-5, 19, 26, 36, 17, 45, 61, 16,
+				27, 32, 58, 62, 80, 67, 26, 44,
+				32, 42, 32, 51, 63, 9, 31, 43,
+			},
+			//QUEEN
+			{
+				-20, -10, -10, -5, -5, -10, -10, -20,
+				-10, 0, 0, 0, 0, 0, 0, -10,
+				-10, 0, 5, 5, 5, 5, 0, -10,
+				-10, 0, 5, 8, 8, 5, 0, -10,
+				-10, 0, 5, 8, 8, 5, 0, -10,
+				-10, 0, 5, 5, 5, 5, 0, -10,
+				-10, 0, 0, 0, 0, 0, 0, -10,
+				-20, -10, -10, -5, -5, -10, -10, -20,
+			},
+			//KING
+			{
+				-15, -4, -19, -54, -40, -28, 44, 14,
+				1, 7, -8, -64, -43, -16, 9, 8,
+				-14, -14, -22, -46, -44, -30, -15, -27,
+				-49, -1, -27, -39, -46, -44, -33, -51,
+				-17, -20, -12, -27, -30, -25, -14, -36,
+				-9, 24, 2, -16, -20, 6, 22, -22,
+				29, -1, -20, -7, -8, -4, -38, -29,
+				-65, 23, 16, -15, -56, -34, 2, 13
+			},
+		},
+		//EG TABLES
+		{
+			//PAWN
+			{
+				0, 0, 0, 0, 0, 0, 0, 0,
+				13, 8, 8, 10, 13, 0, 2, -7,
+				4, 7, -6, 1, 0, -5, -1, -8,
+				13, 9, -3, -7, -7, -8, 3, -1,
+				32, 24, 13, 5, -2, 4, 17, 17,
+				94, 100, 85, 67, 56, 53, 82, 84,
+				178, 173, 158, 134, 147, 132, 165, 187,
+				0, 0, 0, 0, 0, 0, 0, 0,
+			},
+
+			//KNIGHT
+			{
+				-50, -40, -30, -30, -30, -30, -40, -50,
+				-40, -20, 0, 0, 0, 0, -20, -40,
+				-30, 0, 10, 15, 15, 10, 0, -30,
+				-30, 5, 15, 20, 20, 15, 5, -30,
+				-30, 5, 15, 20, 20, 15, 5, -30,
+				-30, 0, 10, 15, 15, 10, 0, -30,
+				-40, -20, 0, 0, 0, 0, -20, -40,
+				-50, -40, -30, -30, -30, -30, -40, -50
+			},
+			//BISHOP
+			{
+				-33, -3, -14, -21, -13, -12, -39, -21,
+				4, 15, 16, 0, 7, 21, 33, 1,
+				0, 15, 15, 4, 3, 27, 18, 10,
+				-6, 13, 13, 26, 34, 12, 10, 4,
+				-4, 5, 19, 50, 37, 37, 7, -2,
+				-16, 37, 43, 40, 35, 50, 37, -2,
+				-26, 16, -18, -13, 30, 59, 18, -47,
+				-29, 4, -82, -37, -25, -42, 7, -8,
+			},
+			//ROOK
+			{
+				-19, -13, 1, 17, 16, 7, -37, -26,
+				-44, -16, -20, -9, -1, 11, -6, -71,
+				-45, -25, -16, -17, 3, 0, -5, -33,
+				-36, -26, -12, -1, 9, -7, 6, -23,
+				-24, -11, 7, 26, 24, 35, -8, -20,
+				-5, 19, 26, 36, 17, 45, 61, 16,
+				27, 32, 58, 62, 80, 67, 26, 44,
+				32, 42, 32, 51, 63, 9, 31, 43,
+			},
+			//QUEEN
+			{
+				-20, -10, -10, -5, -5, -10, -10, -20,
+				-10, 0, 0, 0, 0, 0, 0, -10,
+				-10, 0, 5, 5, 5, 5, 0, -10,
+				-10, 0, 5, 8, 8, 5, 0, -10,
+				-10, 0, 5, 8, 8, 5, 0, -10,
+				-10, 0, 5, 5, 5, 5, 0, -10,
+				-10, 0, 0, 0, 0, 0, 0, -10,
+				-20, -10, -10, -5, -5, -10, -10, -20,
+			},
+			//KING
+			{
+				-53, -34, -21, -11, -28, -14, -24, -43,
+				-27, -11, 4, 13, 14, 4, -5, -17,
+				-19, -3, 11, 21, 23, 16, 7, -9,
+				-18, -4, 21, 24, 27, 23, 9, -11,
+				-8, 22, 24, 27, 26, 33, 26, 3,
+				10, 17, 23, 15, 20, 45, 44, 13,
+				-12, 17, 14, 17, 17, 38, 23, 11,
+				-74, -35, -18, -18, -11, 15, 4, -17
+			},
+		}
+	},
+	//BLACK TABLES
+	{
+		//MG TABLES
+		{
+			//PAWN
+			{
+				0, 0, 0, 0, 0, 0, 0, 0,
+				98, 134, 61, 95, 68, 126, 34, -11,
+				-6, 7, 26, 31, 65, 56, 25, -20,
+				-14, 13, 6, 21, 23, 12, 17, -23,
+				-27, -2, -5, 12, 17, 6, 10, -25,
+				-26, -4, -4, -10, 3, 3, 33, -12,
+				-35, -1, -20, -23, -15, 24, 38, -22,
+				0, 0, 0, 0, 0, 0, 0, 0,
+			},
+
+			//KNIGHT
+			{
+				-50, -40, -30, -30, -30, -30, -40, -50,
+				-40, -20, 0, 0, 0, 0, -20, -40,
+				-30, 0, 10, 15, 15, 10, 0, -30,
+				-30, 5, 15, 20, 20, 15, 5, -30,
+				-30, 5, 15, 20, 20, 15, 5, -30,
+				-30, 0, 10, 15, 15, 10, 0, -30,
+				-40, -20, 0, 0, 0, 0, -20, -40,
+				-50, -40, -30, -30, -30, -30, -40, -50
+			},
+			//BISHOP
+			{
+				-29, 4, -82, -37, -25, -42, 7, -8,
+				-26, 16, -18, -13, 30, 59, 18, -47,
+				-16, 37, 43, 40, 35, 50, 37, -2,
+				-4, 5, 19, 50, 37, 37, 7, -2,
+				-6, 13, 13, 26, 34, 12, 10, 4,
+				0, 15, 15, 15, 14, 27, 18, 10,
+				4, 15, 16, 0, 7, 21, 33, 1,
+				-33, -3, -14, -21, -13, -12, -39, -21,
+			},
+			//ROOK
+			{
+				32, 42, 32, 51, 63, 9, 31, 43,
+				27, 32, 58, 62, 80, 67, 26, 44,
+				-5, 19, 26, 36, 17, 45, 61, 16,
+				-24, -11, 7, 26, 24, 35, -8, -20,
+				-36, -26, -12, -1, 9, -7, 6, -23,
+				-45, -25, -16, -17, 3, 0, -5, -33,
+				-44, -16, -20, -9, -1, 11, -6, -71,
+				-19, -13, 1, 17, 16, 7, -37, -26,
+			},
+			//QUEEN
+			{
+				-20, -10, -10, -5, -5, -10, -10, -20,
+				-10, 0, 0, 0, 0, 0, 0, -10,
+				-10, 0, 5, 5, 5, 5, 0, -10,
+				-10, 0, 5, 8, 8, 5, 0, -10,
+				-10, 0, 5, 8, 8, 5, 0, -10,
+				-10, 0, 5, 5, 5, 5, 0, -10,
+				-10, 0, 0, 0, 0, 0, 0, -10,
+				-20, -10, -10, -5, -5, -10, -10, -20,
+			},
+			//KING
+			{
+				-65, 23, 16, -15, -56, -34, 2, 13,
+				29, -1, -20, -7, -8, -4, -38, -29,
+				-9, 24, 2, -16, -20, 6, 22, -22,
+				-17, -20, -12, -27, -30, -25, -14, -36,
+				-49, -1, -27, -39, -46, -44, -33, -51,
+				-14, -14, -22, -46, -44, -30, -15, -27,
+				1, 7, -8, -64, -43, -16, 9, 8,
+				-15, -4, -19, -54, -40, -28, 44, 14,
+			},
+		},
+		//EG TABLES
+		{
+			//PAWN
+			{
+				0, 0, 0, 0, 0, 0, 0, 0,
+				178, 173, 158, 134, 147, 132, 165, 187,
+				94, 100, 85, 67, 56, 53, 82, 84,
+				32, 24, 13, 5, -2, 4, 17, 17,
+				13, 9, -3, -7, -7, -8, 3, -1,
+				4, 7, -6, 1, 0, -5, -1, -8,
+				13, 8, 8, 10, 13, 0, 2, -7,
+				0, 0, 0, 0, 0, 0, 0, 0,
+			},
+
+			//KNIGHT
+			{
+				-50, -40, -30, -30, -30, -30, -40, -50,
+				-40, -20, 0, 0, 0, 0, -20, -40,
+				-30, 0, 10, 15, 15, 10, 0, -30,
+				-30, 5, 15, 20, 20, 15, 5, -30,
+				-30, 5, 15, 20, 20, 15, 5, -30,
+				-30, 0, 10, 15, 15, 10, 0, -30,
+				-40, -20, 0, 0, 0, 0, -20, -40,
+				-50, -40, -30, -30, -30, -30, -40, -50
+			},
+			//BISHOP
+			{
+				-29, 4, -82, -37, -25, -42, 7, -8,
+				-26, 16, -18, -13, 30, 59, 18, -47,
+				-16, 37, 43, 40, 35, 50, 37, -2,
+				-4, 5, 19, 50, 37, 37, 7, -2,
+				-6, 13, 13, 26, 34, 12, 10, 4,
+				0, 15, 15, 15, 14, 27, 18, 10,
+				4, 15, 16, 0, 7, 21, 33, 1,
+				-33, -3, -14, -21, -13, -12, -39, -21,
+			},
+			//ROOK
+			{
+				32, 42, 32, 51, 63, 9, 31, 43,
+				27, 32, 58, 62, 80, 67, 26, 44,
+				-5, 19, 26, 36, 17, 45, 61, 16,
+				-24, -11, 7, 26, 24, 35, -8, -20,
+				-36, -26, -12, -1, 9, -7, 6, -23,
+				-45, -25, -16, -17, 3, 0, -5, -33,
+				-44, -16, -20, -9, -1, 11, -6, -71,
+				-19, -13, 1, 17, 16, 7, -37, -26,
+			},
+			//QUEEN
+			{
+				-20, -10, -10, -5, -5, -10, -10, -20,
+				-10, 0, 0, 0, 0, 0, 0, -10,
+				-10, 0, 5, 5, 5, 5, 0, -10,
+				-10, 0, 5, 8, 8, 5, 0, -10,
+				-10, 0, 5, 8, 8, 5, 0, -10,
+				-10, 0, 5, 5, 5, 5, 0, -10,
+				-10, 0, 0, 0, 0, 0, 0, -10,
+				-20, -10, -10, -5, -5, -10, -10, -20,
+			},
+			//KING
+			{
+				-74, -35, -18, -18, -11, 15, 4, -17,
+				-12, 17, 14, 17, 17, 38, 23, 11,
+				10, 17, 23, 15, 20, 45, 44, 13,
+				-8, 22, 24, 27, 26, 33, 26, 3,
+				-18, -4, 21, 24, 27, 23, 9, -11,
+				-19, -3, 11, 21, 23, 16, 7, -9,
+				-27, -11, 4, 13, 14, 4, -5, -17,
+				-53, -34, -21, -11, -28, -14, -24, -43
+			},
+		}
+	}
+
+};
 
 //Piece square tables
-static int mgPawnTableBlack[64] = {
-		0, 0, 0, 0, 0, 0, 0, 0,
-		98, 134, 61, 95, 68, 126, 34, -11,
-		-6, 7, 26, 31, 65, 56, 25, -20,
-		-14, 13, 6, 21, 23, 12, 17, -23,
-		-27, -2, -5, 12, 17, 6, 10, -25,
-		-26, -4, -4, -10, 3, 3, 33, -12,
-		-35, -1, -20, -23, -15, 24, 38, -22,
-		0, 0, 0, 0, 0, 0, 0, 0,
-};
-
-static int mgPawnTableWhite[64] = {
-		 0, 0, 0, 0, 0, 0, 0, 0,
-		-35, -1, -20, -23, -15, 24, 38, -22,
-		-26, -4, -4, -10, 3, 3, 33, -12,
-		-27, -2, -5, 12, 17, 6, 10, -25,
-		-14, 13, 6, 21, 23, 12, 17, -23,
-		-6, 7, 26, 31, 65, 56, 25, -20,
-		98, 134, 61, 95, 68, 126, 34, -11,
-		0, 0, 0, 0, 0, 0, 0, 0,
-};
-
-static int egPawnTableBlack[64] = {
-		0, 0, 0, 0, 0, 0, 0, 0,
-		178, 173, 158, 134, 147, 132, 165, 187,
-		94, 100, 85, 67, 56, 53, 82, 84,
-		32, 24, 13, 5, -2, 4, 17, 17,
-		13, 9, -3, -7, -7, -8, 3, -1,
-		4, 7, -6, 1, 0, -5, -1, -8,
-		13, 8, 8, 10, 13, 0, 2, -7,
-		0, 0, 0, 0, 0, 0, 0, 0,
-};
-
-static int egPawnTableWhite[64] = {
-		0, 0, 0, 0, 0, 0, 0, 0,
-		13, 8, 8, 10, 13, 0, 2, -7,
-		4, 7, -6, 1, 0, -5, -1, -8,
-		13, 9, -3, -7, -7, -8, 3, -1,
-		32, 24, 13, 5, -2, 4, 17, 17,
-		94, 100, 85, 67, 56, 53, 82, 84,
-		178, 173, 158, 134, 147, 132, 165, 187,
-		0, 0, 0, 0, 0, 0, 0, 0,
-};
-
-static int knightTable[64] = {
-		 -50, -40, -30, -30, -30, -30, -40, -50,
-		-40, -20, 0, 0, 0, 0, -20, -40,
-		-30, 0, 10, 15, 15, 10, 0, -30,
-		-30, 5, 15, 20, 20, 15, 5, -30,
-		-30, 5, 15, 20, 20, 15, 5, -30,
-		-30, 0, 10, 15, 15, 10, 0, -30,
-		-40, -20, 0, 0, 0, 0, -20, -40,
-		-50, -40, -30, -30, -30, -30, -40, -50
-};
-
-static int bishopTableWhite[64] = {
-		-33, -3, -14, -21, -13, -12, -39, -21,
-		4, 15, 16, 0, 7, 21, 33, 1,
-		0, 15, 15, 4, 3, 27, 18, 10,
-		-6, 13, 13, 26, 34, 12, 10, 4,
-		-4, 5, 19, 50, 37, 37, 7, -2,
-		-16, 37, 43, 40, 35, 50, 37, -2,
-		-26, 16, -18, -13, 30, 59, 18, -47,
-		-29, 4, -82, -37, -25, -42, 7, -8,
-};
-
-static int bishopTableBlack[64] = {
-		-29, 4, -82, -37, -25, -42, 7, -8,
-		-26, 16, -18, -13, 30, 59, 18, -47,
-		-16, 37, 43, 40, 35, 50, 37, -2,
-		-4, 5, 19, 50, 37, 37, 7, -2,
-		-6, 13, 13, 26, 34, 12, 10, 4,
-		0, 15, 15, 15, 14, 27, 18, 10,
-		4, 15, 16, 0, 7, 21, 33, 1,
-		-33, -3, -14, -21, -13, -12, -39, -21,
-};
-
-static int rookTableWhite[64] = {
-		-19, -13, 1, 17, 16, 7, -37, -26,
-		-44, -16, -20, -9, -1, 11, -6, -71,
-		-45, -25, -16, -17, 3, 0, -5, -33,
-		-36, -26, -12, -1, 9, -7, 6, -23,
-		-24, -11, 7, 26, 24, 35, -8, -20,
-		-5, 19, 26, 36, 17, 45, 61, 16,
-		27, 32, 58, 62, 80, 67, 26, 44,
-		32, 42, 32, 51, 63, 9, 31, 43,
-};
-
-static int rookTableBlack[64] = {
-		32, 42, 32, 51, 63, 9, 31, 43,
-		27, 32, 58, 62, 80, 67, 26, 44,
-		-5, 19, 26, 36, 17, 45, 61, 16,
-		-24, -11, 7, 26, 24, 35, -8, -20,
-		-36, -26, -12, -1, 9, -7, 6, -23,
-		-45, -25, -16, -17, 3, 0, -5, -33,
-		-44, -16, -20, -9, -1, 11, -6, -71,
-		-19, -13, 1, 17, 16, 7, -37, -26,
-};
-
-static int queenTable[64] = {
-		-20, -10, -10, -5, -5, -10, -10, -20,
-		-10, 0, 0, 0, 0, 0, 0, -10,
-		-10, 0, 5, 5, 5, 5, 0, -10,
-		-10, 0, 5, 8, 8, 5, 0, -10,
-		-10, 0, 5, 8, 8, 5, 0, -10,
-		-10, 0, 5, 5, 5, 5, 0, -10,
-		-10, 0, 0, 0, 0, 0, 0, -10,
-		-20, -10, -10, -5, -5, -10, -10, -20,
-};
-
-static int mgKingTableWhite[64] = {
-		-15, -4, -19, -54, -40, -28, 44, 14,
-		1, 7, -8, -64, -43, -16, 9, 8,
-		-14, -14, -22, -46, -44, -30, -15, -27,
-		-49, -1, -27, -39, -46, -44, -33, -51,
-		-17, -20, -12, -27, -30, -25, -14, -36,
-		-9, 24, 2, -16, -20, 6, 22, -22,
-		29, -1, -20, -7, -8, -4, -38, -29,
-		-65, 23, 16, -15, -56, -34, 2, 13
-};
-
-static int mgKingTableBlack[64] = {
-		-65, 23, 16, -15, -56, -34, 2, 13,
-		29, -1, -20, -7, -8, -4, -38, -29,
-		-9, 24, 2, -16, -20, 6, 22, -22,
-		-17, -20, -12, -27, -30, -25, -14, -36,
-		-49, -1, -27, -39, -46, -44, -33, -51,
-		-14, -14, -22, -46, -44, -30, -15, -27,
-		1, 7, -8, -64, -43, -16, 9, 8,
-		-15, -4, -19, -54, -40, -28, 44, 14,
-};
-
-static int egKingTableWhite[64] = {
-		-53, -34, -21, -11, -28, -14, -24, -43,
-		-27, -11, 4, 13, 14, 4, -5, -17,
-		-19, -3, 11, 21, 23, 16, 7, -9,
-		-18, -4, 21, 24, 27, 23, 9, -11,
-		-8, 22, 24, 27, 26, 33, 26, 3,
-		10, 17, 23, 15, 20, 45, 44, 13,
-		-12, 17, 14, 17, 17, 38, 23, 11,
-		-74, -35, -18, -18, -11, 15, 4, -17
-};
-
-static int egKingTableBlack[64] = {
-		-74, -35, -18, -18, -11, 15, 4, -17,
-		-12, 17, 14, 17, 17, 38, 23, 11,
-		10, 17, 23, 15, 20, 45, 44, 13,
-		-8, 22, 24, 27, 26, 33, 26, 3,
-		-18, -4, 21, 24, 27, 23, 9, -11,
-		-19, -3, 11, 21, 23, 16, 7, -9,
-		-27, -11, 4, 13, 14, 4, -5, -17,
-		-53, -34, -21, -11, -28, -14, -24, -43
-};
-
-static int mateTableKing[64] = {
+static const int mateTableKing[64] = {
 		-1000, -500, -500, -500, -500, -500, -500, -1000,
 		-500, -500, -300, -300, -300, -300, -500, -500,
 		-500, -300, -200, -200, -200, -200, -300, -500,
@@ -174,7 +312,7 @@ static int mateTableKing[64] = {
 		-1000, -500, -500, -500, -500, -500, -500, -1000,
 };
 
-static int CENTER_MANHATTAN_DISTANCE[64] = {
+static const int CENTER_MANHATTAN_DISTANCE[64] = {
 		6, 5, 4, 3, 3, 4, 5, 6,
 		5, 4, 3, 2, 2, 3, 4, 5,
 		4, 3, 2, 1, 1, 2, 3, 4,
@@ -184,7 +322,6 @@ static int CENTER_MANHATTAN_DISTANCE[64] = {
 		5, 4, 3, 2, 2, 3, 4, 5,
 		6, 5, 4, 3, 3, 4, 5, 6
 };
-
 
 float Eval::whitePhase(Bitboard white_knight_BB, Bitboard white_bishop_BB, Bitboard white_rook_BB, Bitboard white_queen_BB) {
 	int white_material =
@@ -271,6 +408,8 @@ bool Eval::winnable(Bitboard white_pawn_BB, Bitboard white_knight_BB, Bitboard w
 
 		return false;
 	}
+
+	return false;
 }
 
 int Eval::evaluate(Board* board) {
@@ -313,17 +452,28 @@ int Eval::evaluate(Board* board) {
 	int white_pawns = white_pawn_BB.count();
 	int black_pawns = black_pawn_BB.count();
 
+	//number of queens
 	int white_queens = white_queen_BB.count();
 	int black_queens = black_queen_BB.count();
+
+	//number of rooks
+	int white_rooks = white_rook_BB.count();
+	int black_rooks = black_rook_BB.count();
+
+	//Number of knights
+	int white_knights = white_knight_BB.count();
+	int black_knights = black_knight_BB.count();
+
+	//Number of Bishops
+	int white_bishops = white_knight_BB.count();
+	int black_bishops = black_knight_BB.count();
 
 	int whiteKing = white_king_BB.lsb();
 	int blackKing = black_king_BB.lsb();
 
 	//Game phase
-	float white_mg = whitePhase(white_knight_BB,  white_bishop_BB,  white_rook_BB,  white_queen_BB);
-	float black_mg = blackPhase(black_knight_BB, black_bishop_BB, black_rook_BB, black_queen_BB);
-
-	float phase = (white_mg + black_mg) / 2;
+	float white_mg_phase = whitePhase(white_knight_BB, white_bishop_BB, white_rook_BB, white_queen_BB);
+	float black_mg_phase = blackPhase(black_knight_BB, black_bishop_BB, black_rook_BB, black_queen_BB);
 
 	bool white_can_win = winnable(white_pawn_BB, white_knight_BB, white_bishop_BB, white_rook_BB, white_queen_BB, black_pawn_BB, black_knight_BB, black_bishop_BB, black_rook_BB, black_queen_BB, Color::WHITE);
 	bool black_can_win = winnable(white_pawn_BB, white_knight_BB, white_bishop_BB, white_rook_BB, white_queen_BB, black_pawn_BB, black_knight_BB, black_bishop_BB, black_rook_BB, black_queen_BB, Color::BLACK);
@@ -344,6 +494,9 @@ int Eval::evaluate(Board* board) {
 	//Mobility scores (we only really need these values for king safety in the middle game)
 	int mg_mobility_white = 0;
 	int mg_mobility_black = 0;
+
+	int eg_mobility_white = 0;
+	int eg_mobility_black = 0;
 
 	//Attackers
 	int attack_white_count = 0;
@@ -462,8 +615,8 @@ int Eval::evaluate(Board* board) {
 		int sq = white_knight_BB.pop();
 		Square thisSq = Square(sq);
 
-		mg_score_white += mgPieceValues[1] + knightTable[sq] + knightAdj[white_pawns];
-		eg_score_white += egPieceValues[1] + knightTable[sq] + knightAdj[white_pawns];
+		mg_score_white += mgPieceValues[1] + PSQT[C_WHITE][MG][KNIGHT][sq] + knightAdj[white_pawns];
+		eg_score_white += egPieceValues[1] + PSQT[C_WHITE][EG][KNIGHT][sq] + knightAdj[white_pawns];
 
 		//First rank, encourage development
 		if (sq >= 0 && sq <= 7)
@@ -475,7 +628,7 @@ int Eval::evaluate(Board* board) {
 		int m = attacks.count();
 
 		mg_mobility_white += (4 * m) - 4;
-		eg_score_white += (4 * m) - 4;
+		eg_mobility_white += (4 * m) - 4;
 
 		int atkSq = (attacks & black_ring).count();
 		if (atkSq) {
@@ -501,8 +654,8 @@ int Eval::evaluate(Board* board) {
 		int sq = black_knight_BB.pop();
 		Square thisSq = Square(sq);
 
-		mg_score_black += mgPieceValues[1] + knightTable[sq] + knightAdj[black_pawns];
-		eg_score_black += egPieceValues[1] + knightTable[sq] + knightAdj[black_pawns];
+		mg_score_black += mgPieceValues[1] + PSQT[C_BLACK][MG][KNIGHT][sq] + knightAdj[black_pawns];
+		eg_score_black += egPieceValues[1] + PSQT[C_BLACK][EG][KNIGHT][sq] + knightAdj[black_pawns];
 
 		//First rank, encourage development
 		if (sq >= 56 && sq <= 63)
@@ -513,7 +666,7 @@ int Eval::evaluate(Board* board) {
 		int m = attacks.count();
 
 		mg_mobility_black += (4 * m) - 4;
-		eg_score_black += (4 * m) - 4;
+		eg_mobility_black += (4 * m) - 4;
 
 		int atkSq = (attacks & white_ring).count();
 		if (atkSq) {
@@ -540,8 +693,8 @@ int Eval::evaluate(Board* board) {
 		int sq = white_bishop_BB.pop();
 		Square thisSq = Square(sq);
 
-		mg_score_white += mgPieceValues[2] + bishopTableWhite[sq];
-		eg_score_white += egPieceValues[2] + bishopTableWhite[sq];
+		mg_score_white += mgPieceValues[2] + PSQT[C_WHITE][MG][BISHOP][sq];
+		eg_score_white += egPieceValues[2] + PSQT[C_WHITE][EG][BISHOP][sq];
 
 		//First rank, encourage development
 		if (sq >= 0 && sq <= 7)
@@ -552,7 +705,7 @@ int Eval::evaluate(Board* board) {
 		int m = attacks.count();
 
 		mg_mobility_white += (3 * m) - 7;
-		eg_score_white += (3 * m) - 7;
+		eg_mobility_white += (3 * m) - 7;
 
 		int atkSq = (attacks::bishop(thisSq, (black_bb | white_pawn_BB)) & black_ring).count();
 		if (atkSq) {
@@ -569,8 +722,8 @@ int Eval::evaluate(Board* board) {
 		int sq = black_bishop_BB.pop();
 		Square thisSq = Square(sq);
 
-		mg_score_black += mgPieceValues[2] + bishopTableBlack[sq];
-		eg_score_black += egPieceValues[2] + bishopTableBlack[sq];
+		mg_score_black += mgPieceValues[2] + PSQT[C_BLACK][MG][BISHOP][sq];
+		eg_score_black += egPieceValues[2] + PSQT[C_BLACK][EG][BISHOP][sq];
 
 		//First rank, encourage development
 		if (sq >= 56 && sq <= 63)
@@ -581,10 +734,10 @@ int Eval::evaluate(Board* board) {
 		int m = attacks.count();
 
 		mg_mobility_black += (3 * m) - 7;
-		eg_score_black += (3 * m) - 7;
+		eg_mobility_black += (3 * m) - 7;
 
 
-		int atkSq = (attacks::queen(thisSq, (white_bb | black_pawn_BB)) & white_ring).count();
+		int atkSq = (attacks::bishop(thisSq, (white_bb | black_pawn_BB)) & white_ring).count();
 		if (atkSq) {
 			attack_black_count++;
 			attack_black_weight += 52;
@@ -600,8 +753,8 @@ int Eval::evaluate(Board* board) {
 		int sq = white_rook_BB.pop();
 		Square thisSq = Square(sq);
 
-		mg_score_white += mgPieceValues[3] + rookTableWhite[sq] + rookAdj[white_pawns];
-		eg_score_white += egPieceValues[3] + rookTableWhite[sq] + rookAdj[white_pawns];
+		mg_mobility_white += mgPieceValues[3] + PSQT[C_WHITE][MG][ROOK][sq] + rookAdj[white_pawns];
+		eg_mobility_white += egPieceValues[3] + PSQT[C_WHITE][EG][ROOK][sq] + rookAdj[white_pawns];
 
 		Bitboard attacks = attacks::rook(thisSq, ~white_bb);
 
@@ -631,8 +784,8 @@ int Eval::evaluate(Board* board) {
 		int sq = black_rook_BB.pop();
 		Square thisSq = Square(sq);
 
-		mg_score_black += mgPieceValues[3] + rookTableBlack[sq] + rookAdj[black_pawns];
-		eg_score_black += egPieceValues[3] + rookTableBlack[sq] + rookAdj[black_pawns];
+		mg_mobility_black += mgPieceValues[3] + PSQT[C_BLACK][MG][ROOK][sq] + rookAdj[black_pawns];
+		eg_mobility_black += egPieceValues[3] + PSQT[C_BLACK][EG][ROOK][sq] + rookAdj[black_pawns];
 
 		Bitboard attacks = attacks::rook(thisSq, ~black_bb);
 
@@ -660,8 +813,8 @@ int Eval::evaluate(Board* board) {
 		int sq = white_queen_BB.pop();
 		Square thisSq = Square(sq);
 
-		mg_score_white += mgPieceValues[4] + queenTable[sq];
-		eg_score_white += egPieceValues[4] + queenTable[sq];
+		mg_mobility_white += mgPieceValues[4] + PSQT[C_WHITE][MG][QUEEN][sq];
+		eg_mobility_white += egPieceValues[4] + PSQT[C_WHITE][EG][QUEEN][sq];
 
 		//Mobility
 		Bitboard attacks = attacks::queen(thisSq, ~white_bb);
@@ -685,15 +838,15 @@ int Eval::evaluate(Board* board) {
 		int sq = black_queen_BB.pop();
 		Square thisSq = Square(sq);
 
-		mg_score_black += mgPieceValues[4] + queenTable[sq];
-		eg_score_black += egPieceValues[4] + queenTable[sq];
+		mg_score_black += mgPieceValues[4] + PSQT[C_BLACK][MG][QUEEN][sq];
+		eg_score_black += egPieceValues[4] + PSQT[C_BLACK][EG][QUEEN][sq];
 
 		//Mobility
 		Bitboard attacks = attacks::queen(thisSq, ~black_bb);
 		int m = attacks.count();
 
 		mg_mobility_black += m - 14;
-		eg_score_black += (2 * m) - 14;
+		eg_mobility_black += (2 * m) - 14;
 
 		int atkSq = (attacks::queen(thisSq, (white_bb | black_pawn_BB)) & white_ring).count();
 		if (atkSq) {
@@ -707,14 +860,14 @@ int Eval::evaluate(Board* board) {
 	}
 
 	//Kings
-	mg_score_white += mgKingTableWhite[whiteKing];
-	eg_score_white += egKingTableWhite[whiteKing];
+	mg_score_white += PSQT[C_WHITE][MG][KING][whiteKing];
+	eg_score_white += PSQT[C_WHITE][EG][KING][whiteKing];
 
 	if (whiteKing > 7)
 		mg_score_white -= 27;
 
-	mg_score_black += mgKingTableBlack[blackKing];
-	eg_score_black += egKingTableBlack[blackKing];
+	mg_score_black += PSQT[C_BLACK][MG][KING][blackKing];
+	eg_score_black += PSQT[C_BLACK][EG][KING][blackKing];
 
 	if (blackKing < 56)
 		mg_score_black -= 27;
@@ -722,9 +875,10 @@ int Eval::evaluate(Board* board) {
 	//Pawns
 	while (white_pawn_BB.getBits()) {
 		int sq = white_pawn_BB.pop();
+		Square thisSq = Square(sq);
 
-		mg_score_white += mgPieceValues[0] + mgPawnTableWhite[sq];
-		eg_score_white += egPieceValues[0] + egPawnTableWhite[sq];
+		mg_score_white += mgPieceValues[0] + PSQT[C_WHITE][MG][PAWN][sq];
+		eg_score_white += egPieceValues[0] + PSQT[C_WHITE][EG][PAWN][sq];
 
 		//Pawn shield
 		if (white_ring.check(sq) && whiteKing < 8)
@@ -745,16 +899,16 @@ int Eval::evaluate(Board* board) {
 		if (CENTER_MANHATTAN_DISTANCE[sq] <= 1)
 			mg_score_white += 4;
 
-		Square thisSq = Square(sq);
 		white_vison |= attacks::pawn(Color::WHITE, thisSq);
 
 	}
 
 	while (black_pawn_BB.getBits()) {
 		int sq = black_pawn_BB.pop();
+		Square thisSq = Square(sq);
 
-		mg_score_black += mgPieceValues[0] + mgPawnTableBlack[sq];
-		eg_score_black += egPieceValues[0] + egPawnTableBlack[sq];
+		mg_score_black += mgPieceValues[0] + PSQT[C_BLACK][MG][PAWN][sq];
+		eg_score_black += egPieceValues[0] + PSQT[C_BLACK][EG][PAWN][sq];
 
 		//Pawn shield on first
 		if (black_ring.check(sq) && blackKing > 55)
@@ -775,36 +929,43 @@ int Eval::evaluate(Board* board) {
 		if (CENTER_MANHATTAN_DISTANCE[sq] <= 1)
 			mg_score_black += 4;
 
-		Square thisSq = Square(sq);
 		black_vison |= attacks::pawn(Color::BLACK, thisSq);
 
 	}
 
+	/* Mobility credit */
 	mg_score_white += mg_mobility_white;
 	mg_score_black += mg_mobility_black;
+
+	eg_score_white += eg_mobility_white;
+	eg_score_black += eg_mobility_black;
 	
-	/* Weighted phase scores */
-	score -= (int)((white_mg * mg_score_black) + ((1 - white_mg) * eg_score_black));
-	score += (int)((black_mg * mg_score_white) + ((1 - black_mg) * eg_score_white));
-
 	/* Piece pair adjustments */
-	if (white_bishop_BB.count() == 2)
-		score += (int)(10 * phase + 17 * (1 - phase));
+	if (white_bishops == 2) {
+		mg_score_white += 10;
+		eg_score_white += 17;
+	}
 
-	if (black_bishop_BB.count() == 2)
-		score -= (int)(10 * phase + 17 * (1 - phase));
+	if (black_bishops == 2) {
+		mg_score_black += 10;
+		eg_score_black += 17;
+	}
 
-	if (white_knight_BB.count() == 2)
-		score -= (int)(10 * phase + 17 * (1 - phase));
+	if (white_knights == 2) {
+		mg_score_white -= 10;
+		eg_score_white -= 17;
+	}
 
-	if (black_knight_BB.count() == 2)
-		score += (int)(10 * phase + 17 * (1 - phase));
+	if (black_knights == 2) {
+		mg_score_black -= 10;
+		eg_score_black -= 17;
+	}
 
-	if (white_rook_BB.count() == 2)
-		score -= (int)(12 * phase);
+	if (white_rooks == 2)
+		mg_score_white -= 12;
 
-	if (black_rook_BB.count() == 2)
-		score += (int)(12 * phase);
+	if (black_rooks == 2)
+		mg_score_black -= 12;
 
 	weak_white = ((black_vison & white_ring) & ~white_vison).count();
 	weak_black = ((white_vison & black_ring) & ~black_vison).count();
@@ -842,11 +1003,15 @@ int Eval::evaluate(Board* board) {
 	if (black_queens == 0)
 		attack_score_black /= 2;
 
-	if (attack_score_white)
-		score += attack_score_white * phase;
+	if (attack_score_white) {
+		mg_score_white += attack_score_white;
+	}
+	if (attack_score_black) {
+		mg_score_black += attack_score_black;
+	}
 
-	if (attack_score_black)
-		score -= attack_score_black * phase;
+	/* Weighted phase scores */
+	score += (((mg_score_white * white_mg_phase) + (eg_score_white * (1 - white_mg_phase))) - ((mg_score_black * black_mg_phase) + (eg_score_black * (1 - black_mg_phase))));
 
 
 	/* MATE SQUARE */
@@ -890,12 +1055,9 @@ int Eval::evaluate(Board* board) {
 		score -= (int)distance * scale;
 	}
 
-	/* 50 MOVE DRAW CONSIDERATIONS */
-	if (white_mg < 0.10f || black_mg < 0.10f) {
-		//50 move draw reduction
-		int movesBeforeDraw = 100 - board->halfMoveClock();
-		score = (movesBeforeDraw * score) / 100;
-	}
+	/* 50 MOVE DRAW REDUCTION */
+	int movesBeforeDraw = 100 - board->halfMoveClock();
+	score = (movesBeforeDraw * score) / 100;
 
 	/* Drawish-positions */
 	if (!white_can_win)
@@ -905,8 +1067,7 @@ int Eval::evaluate(Board* board) {
 		score = std::max(0, score);
 
 	//Other likely draws
-	if (phase == 0.0f) {
-
+	if (black_mg_phase <= 0.1f || white_mg_phase <= 0.1f) {
 		if (white_pawns == black_pawns && white_pawns < 3 && black_pawns < 3) {
 			//Minor vs rook + pawns or rook vs pawns
 			if (score > 0 && white_material - black_material <= 2)
@@ -969,34 +1130,51 @@ int Eval::PsqM(Board* board, Move m) {
 
 	if (p == Piece::WHITEPAWN) {
 
+		Bitboard white_knight_BB = board->pieces(PieceType::KNIGHT, Color::WHITE);
+		Bitboard white_bishop_BB = board->pieces(PieceType::BISHOP, Color::WHITE);
+		Bitboard white_rook_BB = board->pieces(PieceType::ROOK, Color::WHITE);
+		Bitboard white_queen_BB = board->pieces(PieceType::QUEEN, Color::WHITE);
 		Bitboard black_knight_BB = board->pieces(PieceType::KNIGHT, Color::BLACK);
 		Bitboard black_bishop_BB = board->pieces(PieceType::BISHOP, Color::BLACK);
 		Bitboard black_rook_BB = board->pieces(PieceType::ROOK, Color::BLACK);
 		Bitboard black_queen_BB = board->pieces(PieceType::QUEEN, Color::BLACK);
 
-		float black_mg = blackPhase(black_knight_BB, black_bishop_BB, black_rook_BB, black_queen_BB);
-		return (int)(black_mg * (mgPawnTableWhite[m.to().index()] - mgPawnTableWhite[m.from().index()]) - (black_mg - 1) * (egPawnTableWhite[m.to().index()] - egPawnTableWhite[m.from().index()]));
+		float phase = (9 * (white_queen_BB.count() + black_queen_BB.count())) +
+			(5 * (white_rook_BB.count() + black_rook_BB.count())) +
+			(3 * (white_bishop_BB.count() + black_bishop_BB.count())) +
+			(3 * (white_knight_BB.count() + black_knight_BB.count()));
+
+		return (int)((phase * (PSQT[C_WHITE][MG][PAWN][m.to().index()] - PSQT[C_WHITE][MG][PAWN][m.from().index()]) - (phase - 32) * (PSQT[C_WHITE][EG][PAWN][m.to().index()] - PSQT[C_WHITE][EG][PAWN][m.from().index()]))) / 32;
 	}
 	if (p == Piece::WHITEKNIGHT) {
-		return knightTable[m.to().index()] - knightTable[m.from().index()];
+		return PSQT[C_WHITE][MG][KNIGHT][m.to().index()] - PSQT[C_WHITE][MG][KNIGHT][m.from().index()];
 	}
 	if (p == Piece::WHITEBISHOP) {
-		return bishopTableWhite[m.to().index()] - bishopTableWhite[m.from().index()];
+		return PSQT[C_WHITE][MG][BISHOP][m.to().index()] - PSQT[C_WHITE][MG][BISHOP][m.from().index()];
 	}
 	if (p == Piece::WHITEROOK) {
-		return rookTableWhite[m.to().index()] - rookTableWhite[m.from().index()];
+		return PSQT[C_WHITE][MG][ROOK][m.to().index()] - PSQT[C_WHITE][MG][ROOK][m.from().index()];
 	}
 	if (p == Piece::WHITEQUEEN) {
-		return queenTable[m.to().index()] - queenTable[m.from().index()];
+		return PSQT[C_WHITE][MG][QUEEN][m.to().index()] - PSQT[C_WHITE][MG][QUEEN][m.from().index()];
 	}
 	if (p == Piece::WHITEKING) {
+
+		Bitboard white_knight_BB = board->pieces(PieceType::KNIGHT, Color::WHITE);
+		Bitboard white_bishop_BB = board->pieces(PieceType::BISHOP, Color::WHITE);
+		Bitboard white_rook_BB = board->pieces(PieceType::ROOK, Color::WHITE);
+		Bitboard white_queen_BB = board->pieces(PieceType::QUEEN, Color::WHITE);
 		Bitboard black_knight_BB = board->pieces(PieceType::KNIGHT, Color::BLACK);
 		Bitboard black_bishop_BB = board->pieces(PieceType::BISHOP, Color::BLACK);
 		Bitboard black_rook_BB = board->pieces(PieceType::ROOK, Color::BLACK);
 		Bitboard black_queen_BB = board->pieces(PieceType::QUEEN, Color::BLACK);
 
-		float black_mg = blackPhase(black_knight_BB, black_bishop_BB, black_rook_BB, black_queen_BB);
-		return (int)(black_mg * (mgKingTableWhite[m.to().index()] - mgPawnTableWhite[m.from().index()]) - (black_mg - 1) * (egKingTableWhite[m.to().index()] - egKingTableWhite[m.from().index()]));
+		float phase = (9 * (white_queen_BB.count() + black_queen_BB.count())) +
+			(5 * (white_rook_BB.count() + black_rook_BB.count())) +
+			(3 * (white_bishop_BB.count() + black_bishop_BB.count())) +
+			(3 * (white_knight_BB.count() + black_knight_BB.count()));
+
+		return (int)((phase * (PSQT[C_WHITE][MG][KING][m.to().index()] - PSQT[C_WHITE][MG][KING][m.from().index()]) - (phase - 32) * (PSQT[C_WHITE][EG][KING][m.to().index()] - PSQT[C_WHITE][EG][KING][m.from().index()]))) / 32;
 	}
 
 	if (p == Piece::BLACKPAWN) {
@@ -1005,31 +1183,48 @@ int Eval::PsqM(Board* board, Move m) {
 		Bitboard white_bishop_BB = board->pieces(PieceType::BISHOP, Color::WHITE);
 		Bitboard white_rook_BB = board->pieces(PieceType::ROOK, Color::WHITE);
 		Bitboard white_queen_BB = board->pieces(PieceType::QUEEN, Color::WHITE);
+		Bitboard black_knight_BB = board->pieces(PieceType::KNIGHT, Color::BLACK);
+		Bitboard black_bishop_BB = board->pieces(PieceType::BISHOP, Color::BLACK);
+		Bitboard black_rook_BB = board->pieces(PieceType::ROOK, Color::BLACK);
+		Bitboard black_queen_BB = board->pieces(PieceType::QUEEN, Color::BLACK);
 
-		float white_mg = whitePhase(white_knight_BB, white_bishop_BB, white_rook_BB, white_queen_BB);
-		return (int)(white_mg * (mgPawnTableBlack[m.to().index()] - mgPawnTableBlack[m.from().index()]) - (white_mg - 1) * (egPawnTableBlack[m.to().index()] - egPawnTableBlack[m.from().index()]));
+		float phase = (9 * (white_queen_BB.count() + black_queen_BB.count())) +
+			(5 * (white_rook_BB.count() + black_rook_BB.count())) +
+			(3 * (white_bishop_BB.count() + black_bishop_BB.count())) +
+			(3 * (white_knight_BB.count() + black_knight_BB.count()));
+
+		return (int)((phase * (PSQT[C_BLACK][MG][PAWN][m.to().index()] - PSQT[C_BLACK][MG][PAWN][m.from().index()]) - (phase - 32) * (PSQT[C_BLACK][EG][PAWN][m.to().index()] - PSQT[C_BLACK][EG][PAWN][m.from().index()]))) / 32;
 	}
 	if (p == Piece::BLACKKNIGHT) {
-		return knightTable[m.to().index()] - knightTable[m.from().index()];
+		return PSQT[C_BLACK][MG][KNIGHT][m.to().index()] - PSQT[C_BLACK][MG][KNIGHT][m.from().index()];
 	}
 	if (p == Piece::BLACKBISHOP) {
-		return bishopTableBlack[m.to().index()] - bishopTableBlack[m.from().index()];
+		return PSQT[C_BLACK][MG][BISHOP][m.to().index()] - PSQT[C_BLACK][MG][BISHOP][m.from().index()];
 	}
 	if (p == Piece::BLACKROOK) {
-		return rookTableBlack[m.to().index()] - rookTableBlack[m.from().index()];
+		return PSQT[C_BLACK][MG][ROOK][m.to().index()] - PSQT[C_BLACK][MG][ROOK][m.from().index()];
 	}
 	if (p == Piece::BLACKQUEEN) {
-		return queenTable[m.to().index()] - queenTable[m.from().index()];
+		return PSQT[C_BLACK][MG][QUEEN][m.to().index()] - PSQT[C_BLACK][MG][QUEEN][m.from().index()];
 	}
 	if (p == Piece::BLACKKING) {
+
 
 		Bitboard white_knight_BB = board->pieces(PieceType::KNIGHT, Color::WHITE);
 		Bitboard white_bishop_BB = board->pieces(PieceType::BISHOP, Color::WHITE);
 		Bitboard white_rook_BB = board->pieces(PieceType::ROOK, Color::WHITE);
 		Bitboard white_queen_BB = board->pieces(PieceType::QUEEN, Color::WHITE);
+		Bitboard black_knight_BB = board->pieces(PieceType::KNIGHT, Color::BLACK);
+		Bitboard black_bishop_BB = board->pieces(PieceType::BISHOP, Color::BLACK);
+		Bitboard black_rook_BB = board->pieces(PieceType::ROOK, Color::BLACK);
+		Bitboard black_queen_BB = board->pieces(PieceType::QUEEN, Color::BLACK);
 
-		float white_mg = whitePhase(white_knight_BB, white_bishop_BB, white_rook_BB, white_queen_BB);
-		return (int)(white_mg * (mgKingTableBlack[m.to().index()] - mgKingTableBlack[m.from().index()]) - (white_mg - 1) * (egKingTableBlack[m.to().index()] - egKingTableBlack[m.from().index()]));
+		float phase = (9 * (white_queen_BB.count() + black_queen_BB.count())) +
+			(5 * (white_rook_BB.count() + black_rook_BB.count())) +
+			(3 * (white_bishop_BB.count() + black_bishop_BB.count())) +
+			(3 * (white_knight_BB.count() + black_knight_BB.count()));
+
+		return (int)((phase * (PSQT[C_BLACK][MG][KING][m.to().index()] - PSQT[C_BLACK][MG][KING][m.from().index()]) - (phase - 32) * (PSQT[C_BLACK][EG][KING][m.to().index()] - PSQT[C_BLACK][EG][KING][m.from().index()]))) / 32;
 	}
 
 	return 0;

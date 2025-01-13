@@ -7,6 +7,17 @@ class Eval {
 
 public:
 
+    enum Side {
+        C_WHITE=0, C_BLACK
+    };
+    enum Phase {
+        MG = 0, EG
+    };
+
+    enum Material {
+        PAWN = 0, KNIGHT, BISHOP, ROOK, QUEEN, KING
+    };
+
     //Evaluation function
     static float whitePhase(Bitboard white_knight_BB, Bitboard white_bishop_BB, Bitboard white_rook_BB, Bitboard white_queen_BB);
     static float blackPhase(Bitboard black_knight_BB, Bitboard black_bishop_BB, Bitboard black_rook_BB, Bitboard black_queen_BB);
