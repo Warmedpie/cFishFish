@@ -10,6 +10,6 @@ public:
     Move move;
 
     static bool comp(ScoredMove a, ScoredMove b) {
-        return a.score >= b.score;
+        return a.score > b.score;
     }
 };

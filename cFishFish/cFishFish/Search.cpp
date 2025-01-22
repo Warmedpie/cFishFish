@@ -129,6 +129,7 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
     //ONLY PRUNE IN NULL WINDOWS
     if (node.type == CUT && std::abs(alpha - beta) == 1 && !inCheck && !Eval::onlyPawns(board)) {
         int static_eval = Eval::evaluate(board);
+
         //DO NOT NULL PRUNE DRAWS, ONLY NULL PRUNE WHEN STATIC EVAL IS GREATER THAN OR EQUAL TO BETA
         if (static_eval != 0 && static_eval >= beta && prev != 0) {
             int R = depth > 6 ? 4 : 3;
@@ -411,6 +412,7 @@ int Search::negamax(int alpha, int beta, int depth, int ply_deep, Move prev) {
     //if our position is really poor, we do not need to investigate at low depth nodes
     //We do not razor if we are in check.
     if (!board->inCheck()) {
+
         if (depth == 1) {
             int static_eval = Eval::evaluate(board);
 
