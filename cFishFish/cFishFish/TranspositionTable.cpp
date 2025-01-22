@@ -19,6 +19,9 @@ void TranspositionTable::transposition_entry(uint64_t h, entry e) {
 }
 */
 
+entry TranspositionTable::transposition_search_no_adjust(uint64_t h) {
+	return this->table[h];
+}
 
 entry TranspositionTable::transposition_search(uint64_t h) {
 	uint64_t key = get_index(h);

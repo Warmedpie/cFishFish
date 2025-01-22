@@ -174,9 +174,12 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
 
     }
 
+    Move threat_killer = TT.transposition_search_no_adjust((long)(threat_move.to().index() * 64 + threat_move.from().index())).best;
+    Move counter_killer = TT.transposition_search_no_adjust((long)(prev.to().index() * 64 + prev.from().index())).best;
+
     //Play other moves
     if (alpha < beta) {
-        std::vector<ScoredMove> ordered_captures = orderCaptures(table_move);
+        std::vector<ScoredMove> ordered_captures = orderCaptures(table_move, threat_killer, counter_killer);
 
         //Winning and Equal Captures
         for (ScoredMove scoredMove : ordered_captures) {
@@ -239,9 +242,6 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
 
         //Quiet moves
         if (alpha < beta) {
-            Move threat_killer = TT.transposition_search_no_adjust((long)(threat_move.to().index() * 64 + threat_move.from().index())).best;
-            Move counter_killer = TT.transposition_search_no_adjust((long)(prev.to().index() * 64 + prev.from().index())).best;
-
             std::vector<ScoredMove> ordered_moves = orderQuiet(table_move, depth, threat_killer, counter_killer);
 
             for (ScoredMove scoredMove : ordered_moves) {
@@ -450,9 +450,11 @@ int Search::negamax(int alpha, int beta, int depth, int ply_deep, Move prev) {
 
     }
 
+    Move counter_killer = TT.transposition_search_no_adjust((long)(prev.to().index() * 64 + prev.from().index())).best;
+
     //Play other moves
     if (alpha < beta) {
-        std::vector<ScoredMove> ordered_captures = orderCaptures(table_move);
+        std::vector<ScoredMove> ordered_captures = orderCaptures(table_move, 0, counter_killer);
 
         //Winning and Equal Captures
         for (ScoredMove scoredMove : ordered_captures) {
@@ -483,8 +485,6 @@ int Search::negamax(int alpha, int beta, int depth, int ply_deep, Move prev) {
 
         //Quiet moves
         if (alpha < beta) {
-
-            Move counter_killer = TT.transposition_search_no_adjust((long)(prev.to().index() * 64 + prev.from().index())).best;
 
             std::vector<ScoredMove> ordered_moves = orderQuiet(table_move, depth, 0, counter_killer);
 
@@ -747,6 +747,10 @@ std::vector<ScoredMove> Search::orderAll(Move table, int depth, Move counter) {
 
         int score = Eval::PsqM(board, m);
 
+        if (m == counter) {
+            score += 40000;
+        }
+
         if (board->at(m.to()) != Piece::NONE) {
             int to = order_score[board->at(m.to())];
             int from = order_score[board->at(m.from())];
@@ -768,7 +772,6 @@ std::vector<ScoredMove> Search::orderAll(Move table, int depth, Move counter) {
                 score += -2000 + (to - from);
         }
         else {
-
             if (killer_move[depth] == m) {
                 score += 3200;
             }
@@ -779,8 +782,9 @@ std::vector<ScoredMove> Search::orderAll(Move table, int depth, Move counter) {
                 score += 3000;
             }
 
-            else if (m == counter) {
-                score += 4000;
+            Color defender = ~board->sideToMove();
+            if (board->isAttacked(m.to(), defender) && !board->isAttacked(m.to(), ~defender)) {
+                score -= 2000;
             }
 
             score += history_hueristic[m.from().index()][m.to().index()];
@@ -794,7 +798,7 @@ std::vector<ScoredMove> Search::orderAll(Move table, int depth, Move counter) {
 
     }
 
-    std::sort(orderedMoves, orderedMoves + i, ScoredMove::comp);
+    std::sort(orderedMoves, orderedMoves + i - 1, ScoredMove::comp);
 
     std::vector<ScoredMove> data(orderedMoves, orderedMoves + i);
 
@@ -802,7 +806,7 @@ std::vector<ScoredMove> Search::orderAll(Move table, int depth, Move counter) {
 
 }
 
-std::vector<ScoredMove> Search::orderCaptures(Move table) {
+std::vector<ScoredMove> Search::orderCaptures(Move table, Move threat, Move counter) {
 
     Movelist moves;
     movegen::legalmoves<movegen::MoveGenType::CAPTURE>(moves, *board);
@@ -817,6 +821,11 @@ std::vector<ScoredMove> Search::orderCaptures(Move table) {
             continue;
 
         int score = Eval::PsqM(board, m);
+
+
+        if (m == counter) {
+            score += 4000;
+        }
 
         int to = order_score[board->at(m.to())];
         int from = order_score[board->at(m.from())];
@@ -837,6 +846,10 @@ std::vector<ScoredMove> Search::orderCaptures(Move table) {
         else
             score += -2000 + (to - from);
 
+        if (m == threat) {
+            score += 5000;
+        }
+
         ScoredMove sm;
         sm.score = score;
         sm.move = m;
@@ -845,9 +858,9 @@ std::vector<ScoredMove> Search::orderCaptures(Move table) {
 
     }
 
-    std::sort(orderedMoves, orderedMoves + i, ScoredMove::comp);
+    std::sort(orderedMoves, orderedMoves + moves.size(), ScoredMove::comp);
 
-    std::vector<ScoredMove> data(orderedMoves, orderedMoves + i);
+    std::vector<ScoredMove> data(orderedMoves, orderedMoves + moves.size());
 
     return data;
 
@@ -864,27 +877,35 @@ std::vector<ScoredMove> Search::orderQuiet(Move table, int depth, Move threat, M
     for (Move m : moves) {
 
         //Table PV move already tested
-        if (m == table)
+        if (m == table) {
+
             continue;
+        }
+
 
         int score = Eval::PsqM(board, m);
 
+        if (m == counter) {
+            score += 4000;
+        }
+
         if (killer_move[depth] == m) {
-            score += 300;
+            score += 3200;
         }
         else if (killer_move[depth + 1] == m) {
-            score += 200;
+            score += 3100;
         }
         else if (depth > 1 && killer_move[depth - 1] == m) {
-            score += 100;
+            score += 3000;
         }
 
         else if (m == threat) {
-            score += 50;
+            score += 4000;
         }
 
-        else if (m == counter) {
-            score += 50;
+        Color defender = ~board->sideToMove();
+        if (board->isAttacked(m.to(), defender) && !board->isAttacked(m.to(), ~defender)) {
+            score -= 2000;
         }
 
         score += history_hueristic[m.from().index()][m.to().index()];
@@ -897,9 +918,9 @@ std::vector<ScoredMove> Search::orderQuiet(Move table, int depth, Move threat, M
 
     }
 
-    std::sort(orderedMoves, orderedMoves + i, ScoredMove::comp);
+    std::sort(orderedMoves, orderedMoves + moves.size(), ScoredMove::comp);
 
-    std::vector<ScoredMove> data(orderedMoves, orderedMoves + i);
+    std::vector<ScoredMove> data(orderedMoves, orderedMoves + moves.size());
 
     return data;
 
@@ -910,9 +931,8 @@ std::vector<ScoredMove> Search::orderChecks() {
     Movelist moves;
     movegen::legalmoves<movegen::MoveGenType::QUIET>(moves, *board);
 
-    ScoredMove orderedMoves[moves.size()];
-
     bool check = board->inCheck();
+    ScoredMove orderedMoves[moves.size()];
 
     int i = 0;
     for (Move m : moves) {
@@ -934,9 +954,10 @@ std::vector<ScoredMove> Search::orderChecks() {
 
     }
 
-    std::sort(orderedMoves, orderedMoves + i, ScoredMove::comp);
 
-    std::vector<ScoredMove> data(orderedMoves, orderedMoves + i);
+    std::sort(orderedMoves, orderedMoves + moves.size(), ScoredMove::comp);
+
+    std::vector<ScoredMove> data(orderedMoves, orderedMoves + moves.size());
 
     return data;
 

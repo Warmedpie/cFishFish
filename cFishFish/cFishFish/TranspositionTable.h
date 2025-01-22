@@ -34,6 +34,7 @@ public:
 
 	void transposition_entry(uint64_t h, entry e);
 	entry transposition_search(uint64_t h);
+	entry transposition_search_no_adjust(uint64_t h);
 
 	inline void clear() {
 		transposition_table.clear();

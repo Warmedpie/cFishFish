@@ -76,7 +76,7 @@ public:
 	bool hasLegalMoves();
 
 	std::vector<ScoredMove> orderAll(Move best, int depth, Move counter = 0);
-	std::vector<ScoredMove> orderCaptures(Move best, Move threat = 0);
+	std::vector<ScoredMove> orderCaptures(Move best);
 	std::vector<ScoredMove> orderQuiet(Move best, int depth, Move threat = 0, Move counter = 0);
 	std::vector<ScoredMove> orderChecks();
 

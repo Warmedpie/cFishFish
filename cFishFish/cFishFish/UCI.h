@@ -213,7 +213,7 @@ public:
 
 				Move best = search.bestMove(0);
 
-				std::vector<ScoredMove> moves = search.orderAll(best, last_depth, prev);
+				std::vector<ScoredMove> moves = search.orderAll(best, last_depth);
 
 				for (int i = 0; i < moves.size(); i++) {
 					std::cout << moves[i].move << ":" << moves[i].score << std::endl;
