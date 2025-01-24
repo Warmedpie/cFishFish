@@ -293,6 +293,14 @@ public:
 					//This logic needs to be moved into a thread.
 					search.setup(board, search_time);
 
+					Movelist moves;
+					movegen::legalmoves<>(moves, *board);
+
+					if (moves.size() == 1) {
+						std::cout << "bestmove " << uci::moveToUci(moves[0]) << std::endl;
+						return;
+					}
+						 
 
 					Move best_move = 0;
 					for (int i = 3; i <= depth; i++) {

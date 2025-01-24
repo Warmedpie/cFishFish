@@ -328,22 +328,22 @@ static const int CENTER_MANHATTAN_DISTANCE[64] = {
 
 float Eval::whitePhase(Bitboard white_knight_BB, Bitboard white_bishop_BB, Bitboard white_rook_BB, Bitboard white_queen_BB) {
 	int white_material =
-		(white_knight_BB.count() * 3) +
-		(white_bishop_BB.count() * 3) +
-		(white_rook_BB.count() * 5) +
-		(white_queen_BB.count() * 9);
+		(white_knight_BB.count() * mgPieceValues[1]) +
+		(white_bishop_BB.count() * mgPieceValues[2]) +
+		(white_rook_BB.count() * mgPieceValues[3]) +
+		(white_queen_BB.count() * mgPieceValues[4]);
 
-	return std::max(0.0f, (((float)white_material - 10) / 21));
+	return std::max(0.0f, (((float)white_material - 954) / 3454));
 }
 
 float Eval::blackPhase(Bitboard black_knight_BB, Bitboard black_bishop_BB, Bitboard black_rook_BB, Bitboard black_queen_BB) {
 	int black_material =
-		(black_knight_BB.count() * 3) +
-		(black_bishop_BB.count() * 3) +
-		(black_rook_BB.count() * 5) +
-		(black_queen_BB.count() * 9);
+		(black_knight_BB.count() * mgPieceValues[1]) +
+		(black_bishop_BB.count() * mgPieceValues[2]) +
+		(black_rook_BB.count() * mgPieceValues[3]) +
+		(black_queen_BB.count() * mgPieceValues[4]);
 
-	return std::max(0.0f, (((float)black_material - 10) / 21));
+	return std::max(0.0f, (((float)black_material - 954) / 3454));
 }
 
 bool Eval::winnable(Bitboard white_pawn_BB, Bitboard white_knight_BB, Bitboard white_bishop_BB, Bitboard white_rook_BB, Bitboard white_queen_BB, Bitboard black_pawn_BB, Bitboard black_knight_BB, Bitboard black_bishop_BB, Bitboard black_rook_BB, Bitboard black_queen_BB, Color c) {
@@ -519,6 +519,12 @@ int Eval::evaluate(Board* board) {
 
 	int weak_white = 0;
 	int weak_black = 0;
+
+	int bonus_white_weak = 0;
+	int bonus_black_weak = 0;
+
+	int bonus_attacker_white = 0;
+	int bonus_attacker_black = 0;
 
 	Bitboard white_ring = kingRing(whiteKing);
 	Bitboard black_ring = kingRing(blackKing);
@@ -705,6 +711,11 @@ int Eval::evaluate(Board* board) {
 			attack_squares_white += atkSq;
 		}
 
+		if (atkSq > 0 && (black_pawn_BB & Bitboard(File(sq))).count() == 0) {
+			bonus_white_weak += atkSq;
+			bonus_attacker_white++;
+		}
+
 		white_vison_rook |= attacks;
 
 	}
@@ -736,6 +747,11 @@ int Eval::evaluate(Board* board) {
 			attack_black_count++;
 			attack_black_weight += 44;
 			attack_squares_black += atkSq;
+		}
+
+		if ((white_pawn_BB & Bitboard(File(sq))).count() == 0) {
+			bonus_black_weak += atkSq;
+			bonus_attacker_black++;
 		}
 
 		black_vison_rook |= attacks;
@@ -824,10 +840,12 @@ int Eval::evaluate(Board* board) {
 			white_shield--;
 
 		//Space
-		if ((sq + 8 <= 63) && board->at(Square(sq + 8)) != Piece::WHITEPAWN) {
-			score += 2;
-			if ((sq + 16 <= 63) && board->at(Square(sq + 16)) != Piece::WHITEPAWN) {
+		if (File(sq) != File::FILE_A && File(sq) != File::FILE_B && File(sq) != File::FILE_G && File(sq) != File::FILE_H) {
+			if ((sq + 8 <= 63) && board->at(Square(sq + 8)) != Piece::WHITEPAWN) {
 				score += 2;
+				if ((sq + 16 <= 63) && board->at(Square(sq + 16)) != Piece::WHITEPAWN) {
+					score += 2;
+				}
 			}
 		}
 
@@ -854,10 +872,12 @@ int Eval::evaluate(Board* board) {
 			black_shield--;
 
 		//Space
-		if ((sq - 8 > 0) && board->at(Square(sq - 8)) != Piece::BLACKPAWN) {
-			score -= 2;
-			if ((sq - 16 > 0) && board->at(Square(sq - 16)) != Piece::BLACKPAWN) {
+		if (File(sq) != File::FILE_A && File(sq) != File::FILE_B && File(sq) != File::FILE_G && File(sq) != File::FILE_H) {
+			if ((sq - 8 > 0) && board->at(Square(sq - 8)) != Piece::BLACKPAWN) {
 				score -= 2;
+				if ((sq - 16 > 0) && board->at(Square(sq - 16)) != Piece::BLACKPAWN) {
+					score -= 2;
+				}
 			}
 		}
 
@@ -995,7 +1015,7 @@ int Eval::evaluate(Board* board) {
 	weak_white = ((black_vison & white_ring) & ~white_vison).count();
 	weak_black = ((white_vison & black_ring) & ~black_vison).count();
 
-	//White threats
+	//White king threats
 	Bitboard knight_attack_white = attacks::knight(blackKing);
 	Bitboard bisop_attack_white = attacks::bishop(blackKing, board->occ());
 	Bitboard rook_attack_white = attacks::rook(blackKing, board->occ());
@@ -1018,7 +1038,7 @@ int Eval::evaluate(Board* board) {
 	int check_score_black = (safe_knight_checks_black * 60) + (safe_bishop_checks_black * 30) + (safe_rook_checks_black * 45) + (safe_queen_checks_black * 45);
 
 	/* Attack and defense scores */
-	int attack_score_white = attack_white_count > 1 ?
+	int attack_score_white = bonus_attacker_white + attack_white_count > 1 ?
 		//More attackers + bigger attackers
 		(attack_white_count * attack_white_weight) +
 		//Squares we are attacking near king
@@ -1026,7 +1046,7 @@ int Eval::evaluate(Board* board) {
 		//Safe checks on the king
 		check_score_white +
 		//Squares with only a king defender in the king ring
-		(90 * weak_black) -
+		(90 * (bonus_white_weak + weak_black)) -
 		//Score of pawns covering the king
 		(black_shield * 50) -
 		//Using a knight to defend the king
@@ -1036,7 +1056,7 @@ int Eval::evaluate(Board* board) {
 	if (white_queens == 0)
 		attack_score_white /= 2;
 
-	int attack_score_black = attack_black_count > 1 ?
+	int attack_score_black = bonus_attacker_black + attack_black_count > 1 ?
 		//More attackers + bigger attackers
 		(attack_black_count * attack_black_weight) +
 		//Squares we are attacking near king
@@ -1044,7 +1064,7 @@ int Eval::evaluate(Board* board) {
 		//Safe checks on the king
 		check_score_black +
 		//Squares with only a king defender in the king ring
-		(90 * weak_white) -
+		(90 * (bonus_black_weak + weak_white)) -
 		//Score of pawns covering the king
 		(white_shield * 50) -
 		//Using a knight to defend the king
