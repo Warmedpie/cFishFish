@@ -528,6 +528,14 @@ int Eval::evaluate(Board* board) {
 
 	Bitboard white_ring = kingRing(whiteKing);
 	Bitboard black_ring = kingRing(blackKing);
+
+	//Defenders
+	Bitboard large_white_ring = kingRing(whiteKing + 8) | kingRing(whiteKing - 8) | white_ring;
+	Bitboard large_black_ring = kingRing(blackKing + 8) | kingRing(blackKing - 8) | black_ring;
+	
+	int white_defenders = 0;
+	int black_defenders = 0;
+
 	Bitboard white_bb = white_pawn_BB | white_knight_BB | white_bishop_BB | white_rook_BB | white_queen_BB;
 	Bitboard black_bb = black_pawn_BB | black_knight_BB | black_bishop_BB | black_rook_BB | black_queen_BB;
 
@@ -578,6 +586,10 @@ int Eval::evaluate(Board* board) {
 
 		white_vison_knight |= attacks;
 
+		if (large_white_ring.check(sq)) {
+			white_defenders++;
+		}
+
 		//Center control
 		if (CENTER_MANHATTAN_DISTANCE[sq] <= 2)
 			mg_score_white += 4;
@@ -616,6 +628,10 @@ int Eval::evaluate(Board* board) {
 
 		black_vison_knight |= attacks;
 
+		if (large_black_ring.check(sq)) {
+			black_defenders++;
+		}
+
 		//Center control
 		if (CENTER_MANHATTAN_DISTANCE[sq] <= 2)
 			mg_score_black += 4;
@@ -641,12 +657,24 @@ int Eval::evaluate(Board* board) {
 		mg_mobility_white += 3 * (m - 7);
 		eg_mobility_white += 3 * (m - 7);
 
+
+		//Bishop counts for pawn shield too
+		if (white_ring.check(sq) && whiteKing < 8)
+			white_shield++;
+
+		if (white_ring.check(sq) && whiteKing >= 8)
+			white_shield--;
+
 		//X-ray our pieces for batter/ discovery
 		int atkSq = (attacks::bishop(thisSq, (black_bb | white_pawn_BB)) & black_ring).count();
 		if (atkSq) {
 			attack_white_count++;
 			attack_white_weight += 52;
 			attack_squares_white += atkSq;
+		}
+
+		if (large_white_ring.check(sq)) {
+			white_defenders+=2;
 		}
 
 		white_vison_bishop |= attacks;
@@ -671,12 +699,23 @@ int Eval::evaluate(Board* board) {
 		mg_mobility_black += 3 * (m - 7);
 		eg_mobility_black += 3 * (m - 7);
 
+		//Bishop counts for pawn shield too
+		if (black_ring.check(sq) && blackKing > 55)
+			black_shield++;
+
+		if (black_ring.check(sq) && blackKing <= 55)
+			black_shield--;
+
 		//X-ray our pieces for batter/ discovery
 		int atkSq = (attacks::bishop(thisSq, (white_bb | black_pawn_BB)) & white_ring).count();
 		if (atkSq) {
 			attack_black_count++;
 			attack_black_weight += 52;
 			attack_squares_black += atkSq;
+		}
+
+		if (large_black_ring.check(sq)) {
+			black_defenders+=2;
 		}
 
 		black_vison_bishop |= attacks;
@@ -714,6 +753,10 @@ int Eval::evaluate(Board* board) {
 		if (atkSq > 0 && (black_pawn_BB & Bitboard(File(sq))).count() == 0) {
 			bonus_white_weak += atkSq;
 			bonus_attacker_white++;
+		}
+
+		if (large_white_ring.check(sq)) {
+			white_defenders++;
 		}
 
 		white_vison_rook |= attacks;
@@ -754,6 +797,10 @@ int Eval::evaluate(Board* board) {
 			bonus_attacker_black++;
 		}
 
+		if (large_black_ring.check(sq)) {
+			black_defenders++;
+		}
+
 		black_vison_rook |= attacks;
 
 	}
@@ -777,8 +824,12 @@ int Eval::evaluate(Board* board) {
 		int atkSq = (attacks::queen(thisSq, (black_bb | white_pawn_BB)) & black_ring).count();
 		if (atkSq) {
 			attack_white_count++;
-			attack_white_weight += 30;
+			attack_white_weight += 10;
 			attack_squares_white += atkSq;
+		}
+
+		if (large_white_ring.check(sq)) {
+			white_defenders+=3;
 		}
 
 		white_vison_queen |= attacks;
@@ -803,8 +854,12 @@ int Eval::evaluate(Board* board) {
 		int atkSq = (attacks::queen(thisSq, (white_bb | black_pawn_BB)) & white_ring).count();
 		if (atkSq) {
 			attack_black_count++;
-			attack_black_weight += 30;
+			attack_black_weight += 10;
 			attack_squares_black += atkSq;
+		}
+
+		if (large_black_ring.check(sq)) {
+			black_defenders+=3;
 		}
 
 		black_vison_queen |= attacks;
@@ -1049,7 +1104,9 @@ int Eval::evaluate(Board* board) {
 		(90 * (bonus_white_weak + weak_black)) -
 		//Score of pawns covering the king
 		(black_shield * 50) -
-		//Using a knight to defend the king
+		//Pieces close to black king
+		(black_defenders * 50) -
+		//Using a knight defending king
 		(defender_black_knight * 45) : 0;
 
 	//Mate is less likely without a queen
@@ -1067,17 +1124,19 @@ int Eval::evaluate(Board* board) {
 		(90 * (bonus_black_weak + weak_white)) -
 		//Score of pawns covering the king
 		(white_shield * 50) -
-		//Using a knight to defend the king
+		//Pieces close to white king
+		(white_defenders * 50) -
+		//Using a knight defending king
 		(defender_white_knight * 45) : 0;
 
 	//Mate is less likely without a queen
 	if (black_queens == 0)
 		attack_score_black /= 2;
 
-	if (attack_score_white) {
+	if (attack_score_white > 0) {
 		mg_score_white += attack_score_white;
 	}
-	if (attack_score_black) {
+	if (attack_score_black > 0) {
 		mg_score_black += attack_score_black;
 	}
 
