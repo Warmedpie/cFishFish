@@ -1017,11 +1017,6 @@ int Eval::evaluate(Board* board) {
 			mg_score_white += passed_bonus[rank_white] + (s * 20);
 			eg_score_white += passed_bonus[rank_white] + (s * 35);
 
-			Square whiteSq = Square(whiteKing);
-			Square blackSq = Square(blackKing);
-
-			Square pawnSq = Square(file_white.lsb());
-
 		}
 
 		if ((adjacent_white | file_white.count()) == 0 && file_black.count() >= 1) {
@@ -1029,11 +1024,6 @@ int Eval::evaluate(Board* board) {
 
 			mg_score_black += passed_bonus[7 - rank_black] + (s * 20);
 			eg_score_black += passed_bonus[7 - rank_black] + (s * 35);
-
-			Square whiteSq = Square(whiteKing);
-			Square blackSq = Square(blackKing);
-
-			Square pawnSq = Square(file_black.lsb());
 
 		}
 
@@ -1121,7 +1111,7 @@ int Eval::evaluate(Board* board) {
 
 	//Mate is less likely without a queen
 	if (white_queens == 0)
-		attack_score_white  -= 300;
+		attack_score_white /= 2;
 
 	int attack_score_black = bonus_attacker_black + attack_black_count > 1 ?
 		//More attackers + bigger attackers
@@ -1131,7 +1121,7 @@ int Eval::evaluate(Board* board) {
 		//Safe checks on the king
 		check_score_black +
 		//Squares with only a king defender in the king ring
-		(105 * (bonus_black_weak + weak_white)) -
+		(90 * (bonus_black_weak + weak_white)) -
 		//Score of pawns covering the king
 		(white_shield * 50) -
 		//Pieces close to white king
@@ -1141,7 +1131,7 @@ int Eval::evaluate(Board* board) {
 
 	//Mate is less likely without a queen
 	if (black_queens == 0)
-		attack_score_black -= 300;
+		attack_score_black /= 2;
 
 	if (attack_score_white > 0) {
 		mg_score_white += attack_score_white;
@@ -1277,15 +1267,9 @@ int Eval::PsqM(Board* board, Move m) {
 
 		float phase = whitePhase(white_knight_BB, white_bishop_BB, white_rook_BB, white_queen_BB);
 
-		int scale = 1;
-
-		if (isPassed(board, Color::WHITE, m.from().file()))
-			scale += 16;
-
-		//As we get more into an endgame, the score goes up
-		scale /= std::max(0.1f, phase);
-
-		return scale * (int)((phase * (PSQT[C_WHITE][MG][PAWN][m.to().index()] - PSQT[C_WHITE][MG][PAWN][m.from().index()]) + (1 - phase) * (PSQT[C_WHITE][EG][PAWN][m.to().index()] - PSQT[C_WHITE][EG][PAWN][m.from().index()])));
+		if (phase == 0)
+			return 32 * (int)((phase * (PSQT[C_WHITE][MG][PAWN][m.to().index()] - PSQT[C_WHITE][MG][PAWN][m.from().index()]) - (1 - phase) * (PSQT[C_WHITE][EG][PAWN][m.to().index()] - PSQT[C_WHITE][EG][PAWN][m.from().index()])));
+		return (int)((phase * (PSQT[C_WHITE][MG][PAWN][m.to().index()] - PSQT[C_WHITE][MG][PAWN][m.from().index()]) - (1 - phase) * (PSQT[C_WHITE][EG][PAWN][m.to().index()] - PSQT[C_WHITE][EG][PAWN][m.from().index()])));
 	}
 	if (p == Piece::WHITEKNIGHT) {
 		return PSQT[C_WHITE][MG][KNIGHT][m.to().index()] - PSQT[C_WHITE][MG][KNIGHT][m.from().index()];
@@ -1308,7 +1292,7 @@ int Eval::PsqM(Board* board, Move m) {
 
 		float phase = whitePhase(white_knight_BB, white_bishop_BB, white_rook_BB, white_queen_BB);
 
-		return (int)((phase * (PSQT[C_WHITE][MG][KING][m.to().index()] - PSQT[C_WHITE][MG][KING][m.from().index()]) + ((1 - phase) * (PSQT[C_WHITE][EG][KING][m.to().index()] - PSQT[C_WHITE][EG][KING][m.from().index()]))));
+		return (int)((phase * (PSQT[C_WHITE][MG][KING][m.to().index()] - PSQT[C_WHITE][MG][KING][m.from().index()]) - (1 - phase) * (PSQT[C_WHITE][EG][KING][m.to().index()] - PSQT[C_WHITE][EG][KING][m.from().index()])));
 	}
 
 	if (p == Piece::BLACKPAWN) {
@@ -1319,16 +1303,10 @@ int Eval::PsqM(Board* board, Move m) {
 		Bitboard black_queen_BB = board->pieces(PieceType::QUEEN, Color::BLACK);
 
 		float phase = blackPhase(black_knight_BB, black_bishop_BB, black_rook_BB, black_queen_BB);
+		if (phase == 0)
+			return 32 * (int)((phase * (PSQT[C_BLACK][MG][PAWN][m.to().index()] - PSQT[C_BLACK][MG][PAWN][m.from().index()]) - (1 - phase) * (PSQT[C_BLACK][EG][PAWN][m.to().index()] - PSQT[C_BLACK][EG][PAWN][m.from().index()])));
 
-		int scale = 1;
-
-		if (isPassed(board, Color::BLACK, m.to().file()))
-			scale += 16;
-
-		//As we get more into an endgame, the score goes up
-		scale /= std::max(0.1f, phase);
-
-		return scale * (int)((phase * (PSQT[C_BLACK][MG][PAWN][m.to().index()] - PSQT[C_BLACK][MG][PAWN][m.from().index()]) + ((1 - phase) * (PSQT[C_BLACK][EG][PAWN][m.to().index()] - PSQT[C_BLACK][EG][PAWN][m.from().index()]))));
+		return (int)((phase * (PSQT[C_BLACK][MG][PAWN][m.to().index()] - PSQT[C_BLACK][MG][PAWN][m.from().index()]) - (1 - phase) * (PSQT[C_BLACK][EG][PAWN][m.to().index()] - PSQT[C_BLACK][EG][PAWN][m.from().index()])));
 	}
 	if (p == Piece::BLACKKNIGHT) {
 		return PSQT[C_BLACK][MG][KNIGHT][m.to().index()] - PSQT[C_BLACK][MG][KNIGHT][m.from().index()];
@@ -1352,7 +1330,7 @@ int Eval::PsqM(Board* board, Move m) {
 
 		float phase = blackPhase(black_knight_BB, black_bishop_BB, black_rook_BB, black_queen_BB);
 
-		return (int)((phase * (PSQT[C_BLACK][MG][KING][m.to().index()] - PSQT[C_BLACK][MG][KING][m.from().index()]) + (1 - phase) * (PSQT[C_BLACK][EG][KING][m.to().index()] - PSQT[C_BLACK][EG][KING][m.from().index()])));
+		return (int)((phase * (PSQT[C_BLACK][MG][KING][m.to().index()] - PSQT[C_BLACK][MG][KING][m.from().index()]) - (1 - phase) * (PSQT[C_BLACK][EG][KING][m.to().index()] - PSQT[C_BLACK][EG][KING][m.from().index()])));
 	}
 
 	return 0;
@@ -1364,44 +1342,5 @@ bool Eval::onlyPawns(Board* board) {
 	Bitboard occ_all = board->us(Color::WHITE) | board->us(Color::BLACK);
 
 	return !(occ_all ^ occ_pawn_king);
-
-}
-
-bool Eval::isPassed(Board* board, Color team, int file) {
-
-	//Pieces
-	Bitboard white_pawn_BB = board->pieces(PieceType::PAWN, Color::WHITE);
-	Bitboard black_pawn_BB = board->pieces(PieceType::PAWN, Color::BLACK);
-
-	Bitboard file_BB = Bitboard(File(file));
-	Bitboard adj_left_file_BB = 0;
-	Bitboard adj_right_file_BB = 0;
-
-	if (file > 0) adj_left_file_BB = Bitboard(File(file - 1));
-	if (file < 7) adj_right_file_BB = Bitboard(File(file + 1));
-	Bitboard file_white = white_pawn_BB & file_BB;
-	Bitboard file_black = black_pawn_BB & file_BB;
-
-	//Isolated/ Connected bonus
-	Bitboard adjacent_white = (white_pawn_BB & adj_left_file_BB | (white_pawn_BB & adj_right_file_BB));
-	Bitboard adjacent_black = (black_pawn_BB & adj_left_file_BB | (black_pawn_BB & adj_right_file_BB));
-
-	if (team == Color::WHITE) {
-
-		if (file_white.count() == 0)
-			return false;
-
-		return (adjacent_black | file_black).count() == 0;
-	}
-
-	if (team == Color::BLACK) {
-
-		if (file_black.count() == 0)
-			return false;
-
-		return (adjacent_white | file_white).count() == 0;
-	}
-
-	return false;
 
 }

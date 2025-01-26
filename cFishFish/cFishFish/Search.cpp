@@ -260,6 +260,17 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
                     LMR = (int)(0.7844 + std::log(depth) * std::log(i) / 2.4696);
                 }
 
+                Piece from = board->at(move.from());
+
+                //Reduce LMR on passed pawn pushes
+                if (from == Piece::WHITEPAWN && Eval::isPassed(board, Color::WHITE, move.to().file())) {
+                    LMR = std::max(1, LMR);
+                }
+                if (from == Piece::BLACKPAWN && Eval::isPassed(board, Color::BLACK, move.to().file())) {
+                    LMR = std::max(1, LMR);
+                }
+
+
                 if (i == 0) {
                     score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, move);
                 }

@@ -32,4 +32,6 @@ public:
     static int PsqM(Board* board, Move m);
     static bool onlyPawns(Board* board);
 
+    static bool isPassed(Board* board, Color team, int file);
+
 };
