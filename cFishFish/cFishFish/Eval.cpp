@@ -947,6 +947,9 @@ int Eval::evaluate(Board* board) {
 	white_pawn_BB = board->pieces(PieceType::PAWN, Color::WHITE);
 	black_pawn_BB = board->pieces(PieceType::PAWN, Color::BLACK);
 
+	Bitboard white_vison = white_vison_pawn | white_vison_knight | white_vison_bishop | white_vison_rook | white_vison_queen;
+	Bitboard black_vison = black_vison_pawn | black_vison_knight | black_vison_bishop | black_vison_rook | black_vison_queen;
+
 	//Pawn Structure
 	for (int i = 0; i < 8; i++) {
 
@@ -963,19 +966,37 @@ int Eval::evaluate(Board* board) {
 		Bitboard adjacent_white = (white_pawn_BB & adj_left_file_BB | (white_pawn_BB & adj_right_file_BB));
 		Bitboard adjacent_black = (black_pawn_BB & adj_left_file_BB | (black_pawn_BB & adj_right_file_BB));
 
-		int rank_white = Square(file_white.lsb()).rank();
-		int rank_black = Square(file_black.lsb()).rank();
+
+		int sq_white = file_white.lsb();
+		int rank_white = Square(sq_white).rank();
+
+		Bitboard forward_white;
+
+		for (int qqq = rank_white + 1; qqq < 7; qqq++) {
+			forward_white |= Bitboard(Rank(qqq));
+		}
+
+		int sq_black = file_black.lsb();
+		int rank_black = Square(sq_black).rank();
+
+		Bitboard forward_black;
+
+		for (int qqq = rank_black - 1; qqq > 0; qqq--) {
+			forward_black |= Bitboard(Rank(qqq));
+		}
+
 
 		if (file_white.count() >= 1 && adjacent_white.count() == 0) {
 			mg_score_white += isolated_penality[i];
 			eg_score_white += isolated_penality[i] - 5;
 		}
+
 		//connected
 		else if (file_white.count() >= 1) {
 			//suported
 			int s = (white_vison_pawn & file_white).count();
 			//Opposed
-			int op = (file_black).count() >= 1 ? 1 : 0;
+			int op = (forward_white & (adjacent_black | file_black)).count();
 			//phalanx
 			int ph = (white_pawn_BB & Bitboard(rank_white)).count();
 
@@ -992,7 +1013,7 @@ int Eval::evaluate(Board* board) {
 			//suported
 			int s = (black_vison_pawn & file_black).count();
 			//Opposed
-			int op = (file_white).count() >= 1 ? 1 : 0;
+			int op = (forward_black & (adjacent_white | file_white)).count();
 			//phalanx
 			int ph = (black_pawn_BB & Bitboard(rank_black)).count();
 
@@ -1011,29 +1032,35 @@ int Eval::evaluate(Board* board) {
 		}
 
 		//passed pawns
-		if ((adjacent_black | file_black).count() == 0 && file_white.count() >= 1) {
-			int s = (white_vison_pawn & file_white).count();
+		if (file_white.count() > 0 && (forward_white & (adjacent_black | file_black)).count() == 0) {
 
-			mg_score_white += passed_bonus[rank_white] + (s * 20);
-			eg_score_white += passed_bonus[rank_white] + (s * 35);
+			//Pawns defending the pawn
+			int d = (white_vison_pawn & file_white).count();
 
-			Square whiteSq = Square(whiteKing);
-			Square blackSq = Square(blackKing);
+			//Pawns on the same rank and next to the pawn
+			int ph = (adjacent_white & white_pawn_BB & Bitboard(rank_white)).count();
 
-			Square pawnSq = Square(file_white.lsb());
+			//Squares ahead of the pawn that black covers
+			int s = (white_vison & (forward_white & file_BB)).count();
+
+			mg_score_white += passed_bonus[rank_white] + (d * 20) + (ph * 7) + s;
+			eg_score_white += passed_bonus[rank_white] + (d * 35) + (ph * 10) + s;
 
 		}
 
-		if ((adjacent_white | file_white.count()) == 0 && file_black.count() >= 1) {
-			int s = (black_vison_pawn & file_black).count();
+		if (file_black.count() > 0 && (forward_black & (adjacent_white | file_white)).count() == 0) {
 
-			mg_score_black += passed_bonus[7 - rank_black] + (s * 20);
-			eg_score_black += passed_bonus[7 - rank_black] + (s * 35);
+			//Pawns defending the pawn
+			int d = (black_vison_pawn & file_black).count();
 
-			Square whiteSq = Square(whiteKing);
-			Square blackSq = Square(blackKing);
+			//Pawns on the same rank and next to the pawn
+			int ph = (adjacent_black & black_pawn_BB & Bitboard(rank_black)).count();
 
-			Square pawnSq = Square(file_black.lsb());
+			//Squares ahead of the pawn that black covers
+			int s = (black_vison & (forward_black & file_BB)).count();
+
+			mg_score_black += passed_bonus[7 - rank_black] + (d * 20) + (ph * 7) + s;
+			eg_score_black += passed_bonus[7 - rank_black] + (d * 35) + (ph * 10) + s;
 
 		}
 
@@ -1073,9 +1100,6 @@ int Eval::evaluate(Board* board) {
 
 	if (black_rooks == 2)
 		mg_score_black -= 12;
-
-	Bitboard white_vison = white_vison_pawn | white_vison_knight | white_vison_bishop | white_vison_rook | white_vison_queen;
-	Bitboard black_vison = black_vison_pawn | black_vison_knight | black_vison_bishop | black_vison_rook | black_vison_queen;
 
 	weak_white = ((black_vison & white_ring) & ~white_vison).count();
 	weak_black = ((white_vison & black_ring) & ~black_vison).count();
@@ -1391,7 +1415,17 @@ bool Eval::isPassed(Board* board, Color team, int file) {
 		if (file_white.count() == 0)
 			return false;
 
-		return (adjacent_black | file_black).count() == 0;
+		int sq = file_white.lsb();
+
+		int rank = Square(sq).rank();
+
+		Bitboard forward;
+
+		for (int i = rank + 1; i < 7; i++) {
+			forward |= Bitboard(Rank(i));
+		}
+
+		return (forward & (adjacent_black | file_black)).count() == 0;
 	}
 
 	if (team == Color::BLACK) {
@@ -1399,7 +1433,17 @@ bool Eval::isPassed(Board* board, Color team, int file) {
 		if (file_black.count() == 0)
 			return false;
 
-		return (adjacent_white | file_white).count() == 0;
+		int sq = file_black.lsb();
+
+		int rank = Square(sq).rank();
+
+		Bitboard forward;
+
+		for (int i = rank - 1; i > 0; i--) {
+			forward |= Bitboard(Rank(i));
+		}
+
+		return (forward & (adjacent_white | file_white)).count() == 0;
 	}
 
 	return false;
