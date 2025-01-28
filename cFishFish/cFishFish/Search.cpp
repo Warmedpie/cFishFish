@@ -1,6 +1,6 @@
 #include "Search.h"
 
-int Search::PVS_ignore(int alpha, int beta, int depth, int ply_deep, std::vector<Move> ignore, Move prev) {
+int Search::entryPoint(int alpha, int beta, int depth, int ply_deep, std::vector<Move> ignore, Move prev) {
 
     if (checkTimeout())
         return -312312;
@@ -39,20 +39,22 @@ int Search::PVS_ignore(int alpha, int beta, int depth, int ply_deep, std::vector
         if (contains(ignore, move))
             continue;
 
+        bool capture = board->at(move.to()) != Piece::NONE;
+
         board->makeMove(move);
 
         int score = 0;
 
         if (i == 0) {
-            score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, move);
+            score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, {move, capture});
         }
         else {
             //Search with a null window until alpha improves
-            score = -PVS(-alpha - 1, -alpha, depth - 1, ply_deep + 1, move);
+            score = -PVS(-alpha - 1, -alpha, depth - 1, ply_deep + 1, { move, capture });
 
             //re-search required
             if (score > alpha && beta - alpha > 1) {
-                score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, move);
+                score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, { move, capture });
             }
         }
 
@@ -96,7 +98,7 @@ int Search::PVS_ignore(int alpha, int beta, int depth, int ply_deep, std::vector
 
 }
 
-int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
+int Search::PVS(int alpha, int beta, int depth, int ply_deep, MOVE prev) {
 
     if (checkTimeout())
         return -312312;
@@ -116,22 +118,45 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
     if (winLossDraw < 1)
         return winLossDraw;
 
-    if (depth <= 3) {
-        return negamax(alpha, beta, depth, ply_deep, prev);
+    if (depth <= 0) {
+        return qSearch(alpha, beta, 7);
     }
 
     bool inCheck = board->inCheck();
+
+    //Razoring
+    //if our position is really poor, we do not need to investigate at low depth nodes
+    //We do not razor if we are in check.
+    if (!inCheck) {
+
+        if (depth == 1) {
+            int static_eval = Eval::evaluate(board);
+
+            int value = static_eval + (82 * 2);
+            if (value < alpha) {
+                return std::max(qSearch(alpha, beta, 5), value);
+            }
+        }
+        if (depth == 2) {
+            int static_eval = Eval::evaluate(board);
+
+            int value = static_eval + (82 * 5);
+            if (value < alpha) {
+                return std::max(qSearch(alpha, beta, 5), value);
+            }
+        }
+    }
 
     Move threat_move = 0;
 
     //NULL MOVE PRUNE
     //DO NOT PRUNE IF IN CHECK
     //ONLY PRUNE IN NULL WINDOWS
-    if (node.type == CUT && std::abs(alpha - beta) == 1 && !inCheck && !Eval::onlyPawns(board)) {
+    if (depth > 3 && node.type == CUT && std::abs(alpha - beta) == 1 && !inCheck && !Eval::onlyPawns(board)) {
         int static_eval = Eval::evaluate(board);
 
         //DO NOT NULL PRUNE DRAWS, ONLY NULL PRUNE WHEN STATIC EVAL IS GREATER THAN OR EQUAL TO BETA
-        if (static_eval != 0 && static_eval >= beta && prev != 0) {
+        if (static_eval != 0 && static_eval >= beta && prev.m != 0) {
             int R = depth > 6 ? 4 : 3;
 
             if (depth > 8 && static_eval - beta > 256) {
@@ -139,7 +164,7 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
             }
 
             board->makeNullMove();
-            int s = -PVS(-beta, -beta + 1, depth - R - 1, 0, 0);
+            int s = -PVS(-beta, -beta + 1, depth - R - 1, 0, {0, true});
 
             threat_move = TT.transposition_search(board->zobrist()).best;
 
@@ -148,6 +173,8 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
             if (s >= beta)
                 return s;
         }
+
+
     }
 
     int alpha_orig = alpha;
@@ -162,8 +189,11 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
 
     //Play the table move
     if (table_move != 0) {
+
+        bool capture = board->at(table_move.to()) != Piece::NONE;
+
         board->makeMove(table_move);
-        int score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, table_move);
+        int score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, { table_move, capture });
         board->unmakeMove(table_move);
 
         if (score > alpha) {
@@ -205,19 +235,19 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
             }
 
             if (i == 0) {
-                score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, move);
+                score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, { move, true });
             }
             else {
                 //Search with a null window until alpha improves
-                score = -PVS(-alpha - 1, -alpha, depth - 1 - LMR, ply_deep + 1, move);
+                score = -PVS(-alpha - 1, -alpha, depth - 1 - LMR, ply_deep + 1, { move, true });
 
                 //LMR re-search
                 if (score > alpha && LMR > 1) {
-                    score = -PVS(-alpha - 1, -alpha, depth - 1, ply_deep + 1, move);
+                    score = -PVS(-alpha - 1, -alpha, depth - 1, ply_deep + 1, { move, true });
                 }
                 //re-search required
                 if (score > alpha && beta - alpha > 1) {
-                    score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, move);
+                    score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, { move, true });
                 }
             }
 
@@ -241,7 +271,7 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
         //Quiet moves
         if (alpha < beta) {
             Move threat_killer = TT.transposition_search_no_adjust((long)(threat_move.to().index() * 64 + threat_move.from().index())).best;
-            Move counter_killer = TT.transposition_search_no_adjust((long)(prev.to().index() * 64 + prev.from().index())).best;
+            Move counter_killer = TT.transposition_search_no_adjust((long)(prev.m.to().index() * 64 + prev.m.from().index())).best;
 
             std::vector<ScoredMove> ordered_moves = orderQuiet(table_move, depth, threat_killer, counter_killer);
 
@@ -272,18 +302,18 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
 
 
                 if (i == 0) {
-                    score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, move);
+                    score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, { move, false });
                 }
                 else {
                     //Search with a null window until alpha improves
-                    score = -PVS(-alpha - 1, -alpha, depth - 1 - LMR, ply_deep + 1, move);
+                    score = -PVS(-alpha - 1, -alpha, depth - 1 - LMR, ply_deep + 1, { move, false });
                     //LMR re-search
                     if (score > alpha && LMR > 1) {
-                        score = -PVS(-alpha - 1, -alpha, depth - 1, ply_deep + 1, move);
+                        score = -PVS(-alpha - 1, -alpha, depth - 1, ply_deep + 1, { move, false });
                     }
                     //re-search required
                     if (score > alpha && beta - alpha > 1) {
-                        score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, move);
+                        score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, { move, false });
                     }
                 }
 
@@ -333,18 +363,18 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
                 }
 
                 if (i == 0) {
-                    score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, move);
+                    score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, { move, true });
                 }
                 else {
                     //Search with a null window until alpha improves
-                    score = -PVS(-alpha - 1, -alpha, depth - 1 - LMR, ply_deep + 1, move);
+                    score = -PVS(-alpha - 1, -alpha, depth - 1 - LMR, ply_deep + 1, { move, true });
                     //LMR re-search
                     if (score > alpha && LMR > 1) {
-                        score = -PVS(-alpha - 1, -alpha, depth - 1, ply_deep + 1, move);
+                        score = -PVS(-alpha - 1, -alpha, depth - 1, ply_deep + 1, { move, true });
                     }
                     //re-search required
                     if (score > alpha && beta - alpha > 1) {
-                        score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, move);
+                        score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, { move, true });
                     }
                 }
 
@@ -386,200 +416,8 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, Move prev) {
         TT.transposition_entry((long)(threat_move.to().index() * 64 + threat_move.from().index()), insert_node);
     }
 
-    if (prev != 0) {
-        TT.transposition_entry((long)(prev.to().index() * 64 + prev.from().index()), insert_node);
-    }
-
-    return std::min(alpha, beta);
-
-}
-
-int Search::negamax(int alpha, int beta, int depth, int ply_deep, Move prev) {
-
-    if (checkTimeout())
-        return -312312;
-
-    if (board->isRepetition())
-        return 0;
-
-    entry node = TT.transposition_search(board->zobrist());
-    if (nodeTableBreak(node, alpha, beta, depth)) {
-        TB_hits++;
-        return node.score;
-    }
-
-    nodes++;
-
-    int winLossDraw = mateScore(ply_deep);
-    if (winLossDraw < 1) {
-        return winLossDraw;
-    }
-
-    if (depth <= 0) {
-        return qSearch(alpha, beta, 7);
-    }
-
-    //Razoring
-    //if our position is really poor, we do not need to investigate at low depth nodes
-    //We do not razor if we are in check.
-    if (!board->inCheck()) {
-
-        if (depth == 1) {
-            int static_eval = Eval::evaluate(board);
-
-            int value = static_eval + (82 * 2);
-            if (value < alpha) {
-                return std::max(qSearch(alpha, beta, 5), value);
-            }
-        }
-        if (depth == 2) {
-            int static_eval = Eval::evaluate(board);
-
-            int value = static_eval + (82 * 5);
-            if (value < alpha) {
-                return std::max(qSearch(alpha, beta, 5), value);
-            }
-        }
-    }
-
-    int alpha_orig = alpha;
-
-    Move table_move = 0;
-    Move best_move = 0;
-    if (node.best != 0) {
-        table_move = node.best;
-    }
-
-    //Play the table move
-    if (table_move != 0) {
-        board->makeMove(table_move);
-        int score = -negamax(-beta, -alpha, depth - 1, ply_deep + 1, table_move);
-        board->unmakeMove(table_move);
-
-        if (score > alpha) {
-            alpha = score;
-            best_move = table_move;
-        }
-
-    }
-
-    //Play other moves
-    if (alpha < beta) {
-        std::vector<ScoredMove> ordered_captures = orderCaptures(table_move);
-
-        //Winning and Equal Captures
-        for (ScoredMove scoredMove : ordered_captures) {
-
-            if (scoredMove.score <= 0)
-                continue;
-
-            Move move = scoredMove.move;
-
-            board->makeMove(move);
-
-            int score = -negamax(-beta, -alpha, depth - 1, ply_deep + 1, move);
-
-            board->unmakeMove(move);
-
-            if (score > alpha) {
-                alpha = score;
-                best_move = move;
-
-                //Fail-hard beta cut-off
-                if (alpha >= beta) {
-                    break;
-                }
-
-            }
-
-        }
-
-        //Quiet moves
-        if (alpha < beta) {
-
-            Move counter_killer = TT.transposition_search_no_adjust((long)(prev.to().index() * 64 + prev.from().index())).best;
-
-            std::vector<ScoredMove> ordered_moves = orderQuiet(table_move, depth, 0, counter_killer);
-
-            for (ScoredMove scoredMove : ordered_moves) {
-
-                Move move = scoredMove.move;
-
-                board->makeMove(move);
-
-                int score = -negamax(-beta, -alpha, depth - 1, ply_deep + 1, move);
-
-                board->unmakeMove(move);
-
-                if (score > alpha) {
-                    alpha = score;
-                    best_move = move;
-
-                    //Fail-hard beta cut-off
-                    if (alpha >= beta) {
-
-                        if (killer_move[depth] == 0) {
-                            killer_move[depth] = move;
-                        }
-
-                        break;
-                    }
-
-                }
-
-            }
-
-        }
-
-        if (alpha < beta) {
-            //Losing Captures
-            for (ScoredMove scoredMove : ordered_captures) {
-
-                if (scoredMove.score > 0)
-                    continue;
-
-                Move move = scoredMove.move;
-
-                board->makeMove(move);
-
-                int score = -negamax(-beta, -alpha, depth - 1, ply_deep + 1, move);
-
-                board->unmakeMove(move);
-
-                if (score > alpha) {
-                    alpha = score;
-                    best_move = move;
-
-                    //Fail-hard beta cut-off
-                    if (alpha >= beta) {
-                        break;
-                    }
-
-                }
-
-            }
-        }
-
-
-    }
-
-    nodeType type = EXACT;
-
-    //Fail-high (Cut-node)
-    if (alpha >= beta) {
-        type = CUT;
-    }
-    //Fail Low (All-node)
-    else if (alpha == alpha_orig) {
-        type = ALL;
-    }
-
-    entry insert_node = { depth, type, best_move, alpha };
-
-    TT.transposition_entry(board->zobrist(), insert_node);
-
-    if (prev != 0) {
-        TT.transposition_entry((long)(prev.to().index() * 64 + prev.from().index()), insert_node);
+    if (prev.m != 0) {
+        TT.transposition_entry((long)(prev.m.to().index() * 64 + prev.m.from().index()), insert_node);
     }
 
     return std::min(alpha, beta);

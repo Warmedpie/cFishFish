@@ -33,6 +33,11 @@ private:
 
 public:
 
+	struct MOVE {
+		Move m;
+		bool isCapture;
+	};
+
 	inline void set_board(Board* b) {
 		this->board = b;
 	}
@@ -65,9 +70,8 @@ public:
 
 	}
 
-	int PVS_ignore(int alpha, int beta, int depth, int plydeep, std::vector<Move> ignore, Move prev);
-	int PVS(int alpha, int beta, int depth, int plydeep, Move prev);
-	int negamax(int alpha, int beta, int depth, int plydeep, Move prev);
+	int entryPoint(int alpha, int beta, int depth, int plydeep, std::vector<Move> ignore, Move prev);
+	int PVS(int alpha, int beta, int depth, int plydeep, MOVE prev);
 	int qSearch(int alpha, int beta, int depth);
 
 	bool nodeTableBreak(entry node, int depth, int alpha, int beta);

@@ -308,7 +308,7 @@ public:
 						std::vector<Move> ignore = {};
 						int score = 0;
 						for (int multi = 0; multi < multiPv; multi++) {
-							score = search.PVS_ignore(-9999999, 9999999, i, 0, ignore, prev);
+							score = search.entryPoint(-9999999, 9999999, i, 0, ignore, prev);
 
 							if (score == -312312 || score == 312312)
 								break;

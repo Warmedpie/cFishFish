@@ -301,7 +301,8 @@ static const int PSQT[2][2][6][64] = {
 };
 
 static const int isolated_penality[8] = { -12, -16, -16, -18, -19, -15, -14, -17 };
-static const int passed_bonus[8] = { 0, 10, 17, 15, 31, 84, 137 };
+static const int passed_bonus_mg[8] = { 0, 10, 17, 22, 31, 84, 137 };
+static const int passed_bonus_eg[8] = { 0, 13, 23, 29, 42, 105, 171 };
 
 //Piece square tables
 static const int mateTableKing[64] = {
@@ -1043,8 +1044,8 @@ int Eval::evaluate(Board* board) {
 			//Squares ahead of the pawn that black covers
 			int s = (white_vison & (forward_white & file_BB)).count();
 
-			mg_score_white += passed_bonus[rank_white] + (d * 20) + (ph * 7) + s;
-			eg_score_white += passed_bonus[rank_white] + (d * 35) + (ph * 10) + s;
+			mg_score_white += passed_bonus_mg[rank_white] + (d * 20) + (ph * 7) + s;
+			eg_score_white += passed_bonus_eg[rank_white] + (d * 35) + (ph * 10) + s;
 
 		}
 
@@ -1059,8 +1060,8 @@ int Eval::evaluate(Board* board) {
 			//Squares ahead of the pawn that black covers
 			int s = (black_vison & (forward_black & file_BB)).count();
 
-			mg_score_black += passed_bonus[7 - rank_black] + (d * 20) + (ph * 7) + s;
-			eg_score_black += passed_bonus[7 - rank_black] + (d * 35) + (ph * 10) + s;
+			mg_score_black += passed_bonus_mg[7 - rank_black] + (d * 20) + (ph * 7) + s;
+			eg_score_black += passed_bonus_eg[7 - rank_black] + (d * 35) + (ph * 10) + s;
 
 		}
 
@@ -1246,17 +1247,64 @@ int Eval::evaluate(Board* board) {
 				score *= 0.45;
 		}
 
-		else {
-			if (score > 0 && white_material - black_material <= 2)
-				score *= 0.55f;
-			if (score < 0 && black_material - white_material <= 2)
-				score *= 0.55f;
+		if (onlyPawns(board) && white_pawns == 1 && black_pawns == 0) {
 
-			//Two rooks vs rook + minor or two minors vs minor
-			if (score > 0 && white_material - black_material == 3)
-				score *= 0.85;
-			if (score < 0 && black_material - white_material == 3)
-				score *= 0.85;
+			int sq_white = white_pawn_BB.lsb();
+			int rank_white = Square(sq_white).rank();
+
+			Bitboard forward_white;
+
+			for (int qqq = rank_white + 1; qqq < 7; qqq++) {
+				forward_white |= Bitboard(Rank(qqq));
+			}
+
+			Square pawn = Square(sq_white);
+			Square blackKg = Square(board->us(Color::BLACK).lsb());
+
+			if (pawn.file() == File::FILE_A || pawn.file() == File::FILE_H) {
+
+				if ((pawn.rank() == Rank::RANK_7 || pawn.rank() == Rank::RANK_6) && (blackKg.file() == pawn.file() || std::abs(blackKg.file() - pawn.file()) == 1)) {
+
+					if (blackKg.rank() > pawn.rank())
+						return 0;
+
+				}
+
+				if (blackKg.rank() > pawn.rank())
+					score /= 3;
+
+			}
+
+		}
+
+		if (onlyPawns(board) && black_pawns == 1 && white_pawns == 0) {
+
+			int sq_black = black_pawn_BB.lsb();
+			int rank_black = Square(sq_black).rank();
+
+			Bitboard forward_black;
+
+			for (int qqq = rank_black - 1; qqq > 0; qqq--) {
+				forward_black |= Bitboard(Rank(qqq));
+			}
+
+			Square pawn = Square(sq_black);
+			Square whiteKg = Square(board->us(Color::WHITE).lsb());
+
+			if (pawn.file() == File::FILE_A || pawn.file() == File::FILE_H) {
+
+				if ((pawn.rank() == Rank::RANK_2 || pawn.rank() == Rank::RANK_3) && (whiteKg.file() == pawn.file() || std::abs(whiteKg.file() - pawn.file()) == 1)) {
+
+					if (whiteKg.rank() < pawn.rank())
+						return 0;
+
+				}
+
+				if (whiteKg.rank() < pawn.rank())
+					score /= 3;
+
+			}
+
 		}
 
 	}
