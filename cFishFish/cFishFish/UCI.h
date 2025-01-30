@@ -223,7 +223,7 @@ public:
 
 			if (argument == "GO") {
 				int depth = 32;
-				int search_time = 999999999;
+				int search_time = 9999999;
 				int smart_time = 0;
 				bool mateOnly = false;
 
@@ -254,30 +254,30 @@ public:
 						if (i < arguments.size())
 							depth = std::stoi(arguments[i++]);
 					}
-					else if (arguments[i] == "wtime") {
+					else if (arguments[i] == "WTIME") {
 						i++;
 						if (i < arguments.size() && board->sideToMove() == Color::WHITE)
-							smart_time += std::stoi(arguments[i++]) / 600;
+							smart_time += std::stoi(arguments[i++]) / 30;
 					}
-					else if (arguments[i] == "btime") {
+					else if (arguments[i] == "BTIME") {
 						i++;
 						if (i < arguments.size() && board->sideToMove() == Color::BLACK)
-							smart_time += std::stoi(arguments[i++]) / 600;
+							smart_time += std::stoi(arguments[i++]) / 30;
 					}
-					else if (arguments[i] == "winc") {
+					else if (arguments[i] == "WINC") {
 						i++;
 						if (i < arguments.size())
-							smart_time += std::stoi(arguments[i++]);
+							smart_time += std::stoi(arguments[i++]) / 2;
 					}
-					else if (arguments[i] == "binc") {
+					else if (arguments[i] == "BINC") {
 						i++;
 						if (i < arguments.size())
-							smart_time += std::stoi(arguments[i++]);
+							smart_time += std::stoi(arguments[i++]) / 2;
 					}
-
+					else i++;
 				}
 
-				if (smart_time > 0 && search_time == 999999999) {
+				if (smart_time > 0 && search_time == 9999999) {
 					search_time = smart_time;
 				}
 
