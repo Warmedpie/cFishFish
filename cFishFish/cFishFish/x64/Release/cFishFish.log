@@ -1,1 +1,3 @@
-﻿  cFishFish.vcxproj -> C:\Users\Alden\Documents\GitHub\cFishFish\cFishFish\x64\Release\cFishFish.exe
+﻿  In file included from cFishFish.cpp:9:
+./UCI.h(228,10): warning : variable 'mateOnly' set but not used [-Wunused-but-set-variable]
+  cFishFish.vcxproj -> C:\Users\Alden\OneDrive\Documents\GitHub\cFishFish\cFishFish\x64\Release\cFishFish.exe

@@ -130,7 +130,7 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, MOVE prev) {
     if (!inCheck) {
 
         if (depth == 1) {
-            int static_eval = Eval::evaluate(board);
+            int static_eval = Eval::evaluate(board, this->search_time);
 
             int value = static_eval + (82 * 2);
             if (value < alpha) {
@@ -138,7 +138,7 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, MOVE prev) {
             }
         }
         if (depth == 2) {
-            int static_eval = Eval::evaluate(board);
+            int static_eval = Eval::evaluate(board, this->search_time);
 
             int value = static_eval + (82 * 5);
             if (value < alpha) {
@@ -153,7 +153,7 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, MOVE prev) {
     //DO NOT PRUNE IF IN CHECK
     //ONLY PRUNE IN NULL WINDOWS
     if (depth > 3 && node.type == CUT && std::abs(alpha - beta) == 1 && !inCheck && !Eval::onlyPawns(board)) {
-        int static_eval = Eval::evaluate(board);
+        int static_eval = Eval::evaluate(board, this->search_time);
 
         //DO NOT NULL PRUNE DRAWS, ONLY NULL PRUNE WHEN STATIC EVAL IS GREATER THAN OR EQUAL TO BETA
         if (static_eval != 0 && static_eval >= beta && prev.m != 0) {
@@ -294,10 +294,10 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, MOVE prev) {
 
                 //Reduce LMR on passed pawn pushes
                 if (from == Piece::WHITEPAWN && Eval::isPassed(board, Color::WHITE, move.to().file())) {
-                    LMR = std::max(1, LMR);
+                    LMR = std::min(1, LMR);
                 }
                 if (from == Piece::BLACKPAWN && Eval::isPassed(board, Color::BLACK, move.to().file())) {
-                    LMR = std::max(1, LMR);
+                    LMR = std::min(1, LMR);
                 }
 
 
@@ -431,7 +431,7 @@ int Search::qSearch(int alpha, int beta, int depth) {
 
     nodes++;
 
-    int static_eval = Eval::evaluate(board);
+    int static_eval = Eval::evaluate(board, this->search_time);
 
     if (depth <= 0) {
         return static_eval;

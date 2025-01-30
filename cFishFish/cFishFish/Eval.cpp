@@ -416,7 +416,7 @@ bool Eval::winnable(Bitboard white_pawn_BB, Bitboard white_knight_BB, Bitboard w
 	return false;
 }
 
-int Eval::evaluate(Board* board) {
+int Eval::evaluate(Board* board, int search_time) {
 
 	//Pieces
 	Bitboard white_pawn_BB = board->pieces(PieceType::PAWN, Color::WHITE);
@@ -488,12 +488,12 @@ int Eval::evaluate(Board* board) {
 	//score
 	int score = 0;
 
-	//Middle game and endgame score
-	int mg_score_white = 0;
-	int mg_score_black = 0;
+	//Middle game and endgame score (with tempo bonus)
+	int mg_score_white = board->sideToMove() == Color::WHITE ? 14 : 0;
+	int mg_score_black = board->sideToMove() == Color::BLACK ? 14 : 0;
 
-	int eg_score_white = 0;
-	int eg_score_black = 0;
+	int eg_score_white = board->sideToMove() == Color::WHITE ? 14 : 0;
+	int eg_score_black = board->sideToMove() == Color::BLACK ? 14 : 0;
 
 	//Mobility scores (we only really need these values for king safety in the middle game)
 	int mg_mobility_white = 0;
@@ -526,6 +526,10 @@ int Eval::evaluate(Board* board) {
 
 	int bonus_attacker_white = 0;
 	int bonus_attacker_black = 0;
+
+	//imbalance
+	int imbalance_total_white = 0;
+	int imbalance_total_black = 0;
 
 	Bitboard white_ring = kingRing(whiteKing);
 	Bitboard black_ring = kingRing(blackKing);
@@ -560,6 +564,8 @@ int Eval::evaluate(Board* board) {
 
 		mg_score_white += mgPieceValues[1] + PSQT[C_WHITE][MG][KNIGHT][sq] + knightAdj[white_pawns];
 		eg_score_white += egPieceValues[1] + PSQT[C_WHITE][EG][KNIGHT][sq] + knightAdj[white_pawns];
+
+		imbalance_total_white += mgPieceValues[1];
 
 		//First rank, encourage development
 		if (sq >= 0 && sq <= 7)
@@ -604,6 +610,8 @@ int Eval::evaluate(Board* board) {
 		mg_score_black += mgPieceValues[1] + PSQT[C_BLACK][MG][KNIGHT][sq] + knightAdj[black_pawns];
 		eg_score_black += egPieceValues[1] + PSQT[C_BLACK][EG][KNIGHT][sq] + knightAdj[black_pawns];
 
+		imbalance_total_black += mgPieceValues[1];
+
 		//First rank, encourage development
 		if (sq >= 56 && sq <= 63)
 			mg_score_black -= 25;
@@ -647,6 +655,8 @@ int Eval::evaluate(Board* board) {
 		mg_score_white += mgPieceValues[2] + PSQT[C_WHITE][MG][BISHOP][sq];
 		eg_score_white += egPieceValues[2] + PSQT[C_WHITE][EG][BISHOP][sq];
 
+		imbalance_total_white += mgPieceValues[2];
+
 		//First rank, encourage development
 		if (sq >= 0 && sq <= 7)
 			mg_score_white -= 25;
@@ -688,6 +698,8 @@ int Eval::evaluate(Board* board) {
 
 		mg_score_black += mgPieceValues[2] + PSQT[C_BLACK][MG][BISHOP][sq];
 		eg_score_black += egPieceValues[2] + PSQT[C_BLACK][EG][BISHOP][sq];
+
+		imbalance_total_black += mgPieceValues[2];
 
 		//First rank, encourage development
 		if (sq >= 56 && sq <= 63)
@@ -731,6 +743,8 @@ int Eval::evaluate(Board* board) {
 		mg_score_white += mgPieceValues[3] + PSQT[C_WHITE][MG][ROOK][sq] + rookAdj[white_pawns];
 		eg_score_white += egPieceValues[3] + PSQT[C_WHITE][EG][ROOK][sq] + rookAdj[white_pawns];
 
+		imbalance_total_white += mgPieceValues[3];
+
 		Bitboard attacks = attacks::rook(thisSq, board->occ());
 
 		//Only give mobility points when rook isn't trapped
@@ -770,6 +784,8 @@ int Eval::evaluate(Board* board) {
 
 		mg_score_black += mgPieceValues[3] + PSQT[C_BLACK][MG][ROOK][sq] + rookAdj[black_pawns];
 		eg_score_black += egPieceValues[3] + PSQT[C_BLACK][EG][ROOK][sq] + rookAdj[black_pawns];
+
+		imbalance_total_black += mgPieceValues[3];
 
 		Bitboard attacks = attacks::rook(thisSq, board->occ());
 
@@ -814,6 +830,8 @@ int Eval::evaluate(Board* board) {
 		mg_score_white += mgPieceValues[4] + PSQT[C_WHITE][MG][QUEEN][sq];
 		eg_score_white += egPieceValues[4] + PSQT[C_WHITE][EG][QUEEN][sq];
 
+		imbalance_total_white += mgPieceValues[4];
+
 		//Mobility
 		Bitboard attacks = attacks::queen(thisSq, board->occ());
 		int m = attacks.count();
@@ -843,6 +861,8 @@ int Eval::evaluate(Board* board) {
 
 		mg_score_black += mgPieceValues[4] + PSQT[C_BLACK][MG][QUEEN][sq];
 		eg_score_black += egPieceValues[4] + PSQT[C_BLACK][EG][QUEEN][sq];
+
+		imbalance_total_black += mgPieceValues[4];
 
 		//Mobility
 		Bitboard attacks = attacks::queen(thisSq, board->occ());
@@ -888,6 +908,8 @@ int Eval::evaluate(Board* board) {
 		mg_score_white += mgPieceValues[0] + PSQT[C_WHITE][MG][PAWN][sq];
 		eg_score_white += egPieceValues[0] + PSQT[C_WHITE][EG][PAWN][sq];
 
+		imbalance_total_white += mgPieceValues[0];
+
 		//Pawn shield
 		if (white_ring.check(sq) && whiteKing < 8)
 			white_shield++;
@@ -920,6 +942,8 @@ int Eval::evaluate(Board* board) {
 		mg_score_black += mgPieceValues[0] + PSQT[C_BLACK][MG][PAWN][sq];
 		eg_score_black += egPieceValues[0] + PSQT[C_BLACK][EG][PAWN][sq];
 
+		imbalance_total_black += mgPieceValues[0];
+
 		//Pawn shield on first
 		if (black_ring.check(sq) && blackKing > 55)
 			black_shield++;
@@ -950,6 +974,16 @@ int Eval::evaluate(Board* board) {
 
 	Bitboard white_vison = white_vison_pawn | white_vison_knight | white_vison_bishop | white_vison_rook | white_vison_queen;
 	Bitboard black_vison = black_vison_pawn | black_vison_knight | black_vison_bishop | black_vison_rook | black_vison_queen;
+
+	//Max 10, min 1/10;
+	float white_imbalance = std::max(0.50f, std::min(1.5f,(float)(((float)imbalance_total_white + 1) / ((float)imbalance_total_black + 1))));
+	float black_imbalance = std::max(0.50f, std::min(1.5f, (float)(((float)imbalance_total_black + 1) / ((float)imbalance_total_white + 1))));
+
+
+	if (search_time <= 1250) {
+		white_imbalance = 1;
+		black_imbalance = 1;
+	}
 
 	//Pawn Structure
 	for (int i = 0; i < 8; i++) {
@@ -1044,8 +1078,8 @@ int Eval::evaluate(Board* board) {
 			//Squares ahead of the pawn that black covers
 			int s = (white_vison & (forward_white & file_BB)).count();
 
-			mg_score_white += passed_bonus_mg[rank_white] + (d * 20) + (ph * 7) + s;
-			eg_score_white += passed_bonus_eg[rank_white] + (d * 35) + (ph * 10) + s;
+			mg_score_white += (passed_bonus_mg[rank_white] + (d * 20) + (ph * 7) + s) * white_imbalance;
+			eg_score_white += (passed_bonus_eg[rank_white] + (d * 35) + (ph * 10) + s) * white_imbalance;
 
 		}
 
@@ -1060,8 +1094,8 @@ int Eval::evaluate(Board* board) {
 			//Squares ahead of the pawn that black covers
 			int s = (black_vison & (forward_black & file_BB)).count();
 
-			mg_score_black += passed_bonus_mg[7 - rank_black] + (d * 20) + (ph * 7) + s;
-			eg_score_black += passed_bonus_eg[7 - rank_black] + (d * 35) + (ph * 10) + s;
+			mg_score_black += (passed_bonus_mg[7 - rank_black] + (d * 20) + (ph * 7) + s) * black_imbalance;
+			eg_score_black += (passed_bonus_eg[7 - rank_black] + (d * 35) + (ph * 10) + s) * black_imbalance;
 
 		}
 
@@ -1177,7 +1211,8 @@ int Eval::evaluate(Board* board) {
 
 	/* Weighted phase scores */
 	score += (((mg_score_white * white_mg_phase) + (eg_score_white * (1 - white_mg_phase))) - ((mg_score_black * black_mg_phase) + (eg_score_black * (1 - black_mg_phase))));
-
+	if (search_time > 1250)
+		score += (imbalance_total_white - imbalance_total_black) / 24;
 
 	/* MATE SQUARE */
 	if (white_bishops + white_knights < 2 && white_rooks == 0 && white_queens == 0 && (black_rooks > 0 || black_queens > 0 || black_bishops >= 2 || black_knights >= 3 || (black_bishops >= 1 && black_knights >= 1))) {

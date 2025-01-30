@@ -202,7 +202,7 @@ public:
 			}
 
 			if (argument == "STATIC") {
-				std::cout << Eval::evaluate(board) << std::endl;
+				std::cout << Eval::evaluate(board, 1251) << std::endl;
 
 				continue;
 			}
