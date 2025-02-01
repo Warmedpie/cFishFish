@@ -303,7 +303,7 @@ public:
 						 
 
 					Move best_move = 0;
-					for (int i = 3; i <= depth; i++) {
+					for (int i = 1; i <= depth; i++) {
 
 						std::vector<Move> ignore = {};
 						int score = 0;

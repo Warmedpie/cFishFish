@@ -27,9 +27,9 @@ int Search::entryPoint(int alpha, int beta, int depth, int ply_deep, std::vector
 
     int i = 0;
 
-    //Play all other
     Move counter_killer = TT.transposition_search_no_adjust((long)(prev.to().index() * 64 + prev.from().index())).best;
 
+    //Order Moves
     std::vector<ScoredMove> ordered_moves = orderAll(table_move, depth, counter_killer);
 
     for (ScoredMove scoredMove : ordered_moves) {
@@ -119,7 +119,7 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, MOVE prev) {
         return winLossDraw;
 
     if (depth <= 0) {
-        return qSearch(alpha, beta, 7);
+        return qSearch(alpha, beta, 20);
     }
 
     bool inCheck = board->inCheck();
@@ -128,21 +128,22 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, MOVE prev) {
     //if our position is really poor, we do not need to investigate at low depth nodes
     //We do not razor if we are in check.
     if (!inCheck) {
-
         if (depth == 1) {
-            int static_eval = Eval::evaluate(board, this->search_time);
-
-            int value = static_eval + (82 * 2);
+            int value = Eval::evaluate(board, this->search_time) + 200;
             if (value < alpha) {
-                return std::max(qSearch(alpha, beta, 5), value);
+                return std::max(qSearch(alpha, beta, 9), value);
             }
         }
         if (depth == 2) {
-            int static_eval = Eval::evaluate(board, this->search_time);
-
-            int value = static_eval + (82 * 5);
+            int value = Eval::evaluate(board, this->search_time) + 500;
             if (value < alpha) {
-                return std::max(qSearch(alpha, beta, 5), value);
+                return std::max(qSearch(alpha, beta, 9), value);
+            }
+        }
+        if (depth == 3) {
+            int value = Eval::evaluate(board, this->search_time) + 900;
+            if (value < alpha) {
+                return std::max(qSearch(alpha, beta, 9), value);
             }
         }
     }
@@ -152,16 +153,12 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, MOVE prev) {
     //NULL MOVE PRUNE
     //DO NOT PRUNE IF IN CHECK
     //ONLY PRUNE IN NULL WINDOWS
-    if (depth > 3 && node.type == CUT && std::abs(alpha - beta) == 1 && !inCheck && !Eval::onlyPawns(board)) {
+    if (prev.m != 0 && depth > 3 && node.type == CUT && !inCheck && !Eval::onlyPawns(board)) {
         int static_eval = Eval::evaluate(board, this->search_time);
 
         //DO NOT NULL PRUNE DRAWS, ONLY NULL PRUNE WHEN STATIC EVAL IS GREATER THAN OR EQUAL TO BETA
-        if (static_eval != 0 && static_eval >= beta && prev.m != 0) {
-            int R = depth > 6 ? 4 : 3;
-
-            if (depth > 8 && static_eval - beta > 256) {
-                R += (static_eval - beta) / 256;
-            }
+        if (static_eval != 0 && static_eval >= beta) {
+            int R = depth > 6 ? 3 : 2;
 
             board->makeNullMove();
             int s = -PVS(-beta, -beta + 1, depth - R - 1, 0, {0, true});
@@ -292,12 +289,12 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, MOVE prev) {
 
                 Piece from = board->at(move.from());
 
-                //Reduce LMR on passed pawn pushes
+                //passed pawn push causes a search extension
                 if (from == Piece::WHITEPAWN && Eval::isPassed(board, Color::WHITE, move.to().file())) {
-                    LMR = std::min(1, LMR);
+                    LMR = -1;
                 }
                 if (from == Piece::BLACKPAWN && Eval::isPassed(board, Color::BLACK, move.to().file())) {
-                    LMR = std::min(1, LMR);
+                    LMR = -1;
                 }
 
 
@@ -456,14 +453,7 @@ int Search::qSearch(int alpha, int beta, int depth) {
         int to = order_score[board->at(m.to())];
         int from = order_score[board->at(m.from())];
 
-        if (to + static_eval + 200 < alpha)
-            continue;
-
         Color defender = ~board->sideToMove();
-
-        //Hanging
-        if (board->isAttacked(m.to().index(), defender) && to + 200 < from)
-            continue;
 
         board->makeMove(m);
         int score = -qSearch(-beta, -alpha, depth - 1);
@@ -485,7 +475,7 @@ int Search::qSearch(int alpha, int beta, int depth) {
         Move m = scoredMove.move;
 
         board->makeMove(m);
-        int score = -qSearch(-beta, -alpha, depth - 1);
+        int score = -qSearch(-beta, -alpha, std::min(7, depth - 1));
         board->unmakeMove(m);
 
         if (score > alpha) {
