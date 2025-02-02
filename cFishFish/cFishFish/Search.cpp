@@ -289,28 +289,32 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, MOVE prev) {
 
                 Piece from = board->at(move.from());
 
+                int ext = 0;
+
                 //passed pawn push causes a search extension
                 if (from == Piece::WHITEPAWN && Eval::isPassed(board, Color::WHITE, move.to().file())) {
-                    LMR = -1;
+                    ext = 1;
+                    LMR = 0;
                 }
                 if (from == Piece::BLACKPAWN && Eval::isPassed(board, Color::BLACK, move.to().file())) {
-                    LMR = -1;
+                    ext = 1;
+                    LMR = 0;
                 }
 
 
                 if (i == 0) {
-                    score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, { move, false });
+                    score = -PVS(-beta, -alpha, depth - 1 + ext, ply_deep + 1, { move, false });
                 }
                 else {
                     //Search with a null window until alpha improves
-                    score = -PVS(-alpha - 1, -alpha, depth - 1 - LMR, ply_deep + 1, { move, false });
+                    score = -PVS(-alpha - 1, -alpha, depth - 1 - LMR + ext, ply_deep + 1, { move, false });
                     //LMR re-search
                     if (score > alpha && LMR > 1) {
-                        score = -PVS(-alpha - 1, -alpha, depth - 1, ply_deep + 1, { move, false });
+                        score = -PVS(-alpha - 1, -alpha, depth - 1 + ext, ply_deep + 1, { move, false });
                     }
                     //re-search required
                     if (score > alpha && beta - alpha > 1) {
-                        score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, { move, false });
+                        score = -PVS(-beta, -alpha, depth - 1 + ext, ply_deep + 1, { move, false });
                     }
                 }
 
@@ -449,11 +453,6 @@ int Search::qSearch(int alpha, int beta, int depth) {
     for (ScoredMove scoredMove : ordered_captures) {
 
         Move m = scoredMove.move;
-
-        int to = order_score[board->at(m.to())];
-        int from = order_score[board->at(m.from())];
-
-        Color defender = ~board->sideToMove();
 
         board->makeMove(m);
         int score = -qSearch(-beta, -alpha, depth - 1);
