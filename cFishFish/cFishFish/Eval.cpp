@@ -1203,6 +1203,7 @@ int Eval::evaluate(Board* board, int search_time) {
 	if (black_queens == 0)
 		attack_score_black -= 300;
 
+	//Attack score should scale off our own phase
 	if (attack_score_white > 0) {
 		mg_score_white += attack_score_white;
 	}
@@ -1396,16 +1397,48 @@ int Eval::PsqM(Board* board, Move m) {
 		return scale * (int)((phase * (PSQT[C_WHITE][MG][PAWN][m.to().index()] - PSQT[C_WHITE][MG][PAWN][m.from().index()]) + (1 - phase) * (PSQT[C_WHITE][EG][PAWN][m.to().index()] - PSQT[C_WHITE][EG][PAWN][m.from().index()])));
 	}
 	if (p == Piece::WHITEKNIGHT) {
-		return PSQT[C_WHITE][MG][KNIGHT][m.to().index()] - PSQT[C_WHITE][MG][KNIGHT][m.from().index()];
+
+		Bitboard white_knight_BB = board->pieces(PieceType::KNIGHT, Color::WHITE);
+		Bitboard white_bishop_BB = board->pieces(PieceType::BISHOP, Color::WHITE);
+		Bitboard white_rook_BB = board->pieces(PieceType::ROOK, Color::WHITE);
+		Bitboard white_queen_BB = board->pieces(PieceType::QUEEN, Color::WHITE);
+
+		float phase = whitePhase(white_knight_BB, white_bishop_BB, white_rook_BB, white_queen_BB);
+
+		return (int)((phase * (PSQT[C_WHITE][MG][KNIGHT][m.to().index()] - PSQT[C_WHITE][MG][KNIGHT][m.from().index()]) + ((1 - phase) * (PSQT[C_WHITE][EG][KNIGHT][m.to().index()] - PSQT[C_WHITE][EG][KNIGHT][m.from().index()]))));
 	}
 	if (p == Piece::WHITEBISHOP) {
-		return PSQT[C_WHITE][MG][BISHOP][m.to().index()] - PSQT[C_WHITE][MG][BISHOP][m.from().index()];
+
+		Bitboard white_knight_BB = board->pieces(PieceType::KNIGHT, Color::WHITE);
+		Bitboard white_bishop_BB = board->pieces(PieceType::BISHOP, Color::WHITE);
+		Bitboard white_rook_BB = board->pieces(PieceType::ROOK, Color::WHITE);
+		Bitboard white_queen_BB = board->pieces(PieceType::QUEEN, Color::WHITE);
+
+		float phase = whitePhase(white_knight_BB, white_bishop_BB, white_rook_BB, white_queen_BB);
+
+		return (int)((phase * (PSQT[C_WHITE][MG][BISHOP][m.to().index()] - PSQT[C_WHITE][MG][BISHOP][m.from().index()]) + ((1 - phase) * (PSQT[C_WHITE][EG][BISHOP][m.to().index()] - PSQT[C_WHITE][EG][BISHOP][m.from().index()]))));
 	}
 	if (p == Piece::WHITEROOK) {
-		return PSQT[C_WHITE][MG][ROOK][m.to().index()] - PSQT[C_WHITE][MG][ROOK][m.from().index()];
+
+		Bitboard white_knight_BB = board->pieces(PieceType::KNIGHT, Color::WHITE);
+		Bitboard white_bishop_BB = board->pieces(PieceType::BISHOP, Color::WHITE);
+		Bitboard white_rook_BB = board->pieces(PieceType::ROOK, Color::WHITE);
+		Bitboard white_queen_BB = board->pieces(PieceType::QUEEN, Color::WHITE);
+
+		float phase = whitePhase(white_knight_BB, white_bishop_BB, white_rook_BB, white_queen_BB);
+
+		return (int)((phase * (PSQT[C_WHITE][MG][ROOK][m.to().index()] - PSQT[C_WHITE][MG][QUEEN][m.from().index()]) + ((1 - phase) * (PSQT[C_WHITE][EG][ROOK][m.to().index()] - PSQT[C_WHITE][EG][ROOK][m.from().index()]))));
 	}
 	if (p == Piece::WHITEQUEEN) {
-		return PSQT[C_WHITE][MG][QUEEN][m.to().index()] - PSQT[C_WHITE][MG][QUEEN][m.from().index()];
+
+		Bitboard white_knight_BB = board->pieces(PieceType::KNIGHT, Color::WHITE);
+		Bitboard white_bishop_BB = board->pieces(PieceType::BISHOP, Color::WHITE);
+		Bitboard white_rook_BB = board->pieces(PieceType::ROOK, Color::WHITE);
+		Bitboard white_queen_BB = board->pieces(PieceType::QUEEN, Color::WHITE);
+
+		float phase = whitePhase(white_knight_BB, white_bishop_BB, white_rook_BB, white_queen_BB);
+
+		return (int)((phase * (PSQT[C_WHITE][MG][QUEEN][m.to().index()] - PSQT[C_WHITE][MG][QUEEN][m.from().index()]) + ((1 - phase) * (PSQT[C_WHITE][EG][QUEEN][m.to().index()] - PSQT[C_WHITE][EG][QUEEN][m.from().index()]))));
 	}
 	if (p == Piece::WHITEKING) {
 
@@ -1439,19 +1472,50 @@ int Eval::PsqM(Board* board, Move m) {
 		return scale * (int)((phase * (PSQT[C_BLACK][MG][PAWN][m.to().index()] - PSQT[C_BLACK][MG][PAWN][m.from().index()]) + ((1 - phase) * (PSQT[C_BLACK][EG][PAWN][m.to().index()] - PSQT[C_BLACK][EG][PAWN][m.from().index()]))));
 	}
 	if (p == Piece::BLACKKNIGHT) {
-		return PSQT[C_BLACK][MG][KNIGHT][m.to().index()] - PSQT[C_BLACK][MG][KNIGHT][m.from().index()];
+
+		Bitboard black_knight_BB = board->pieces(PieceType::KNIGHT, Color::BLACK);
+		Bitboard black_bishop_BB = board->pieces(PieceType::BISHOP, Color::BLACK);
+		Bitboard black_rook_BB = board->pieces(PieceType::ROOK, Color::BLACK);
+		Bitboard black_queen_BB = board->pieces(PieceType::QUEEN, Color::BLACK);
+
+		float phase = blackPhase(black_knight_BB, black_bishop_BB, black_rook_BB, black_queen_BB);
+
+		return (int)((phase * (PSQT[C_BLACK][MG][KNIGHT][m.to().index()] - PSQT[C_BLACK][MG][KNIGHT][m.from().index()]) + (1 - phase) * (PSQT[C_BLACK][EG][KNIGHT][m.to().index()] - PSQT[C_BLACK][EG][KNIGHT][m.from().index()])));
 	}
 	if (p == Piece::BLACKBISHOP) {
-		return PSQT[C_BLACK][MG][BISHOP][m.to().index()] - PSQT[C_BLACK][MG][BISHOP][m.from().index()];
+
+		Bitboard black_knight_BB = board->pieces(PieceType::KNIGHT, Color::BLACK);
+		Bitboard black_bishop_BB = board->pieces(PieceType::BISHOP, Color::BLACK);
+		Bitboard black_rook_BB = board->pieces(PieceType::ROOK, Color::BLACK);
+		Bitboard black_queen_BB = board->pieces(PieceType::QUEEN, Color::BLACK);
+
+		float phase = blackPhase(black_knight_BB, black_bishop_BB, black_rook_BB, black_queen_BB);
+
+		return (int)((phase * (PSQT[C_BLACK][MG][BISHOP][m.to().index()] - PSQT[C_BLACK][MG][BISHOP][m.from().index()]) + (1 - phase) * (PSQT[C_BLACK][EG][BISHOP][m.to().index()] - PSQT[C_BLACK][EG][BISHOP][m.from().index()])));
 	}
 	if (p == Piece::BLACKROOK) {
-		return PSQT[C_BLACK][MG][ROOK][m.to().index()] - PSQT[C_BLACK][MG][ROOK][m.from().index()];
+
+		Bitboard black_knight_BB = board->pieces(PieceType::KNIGHT, Color::BLACK);
+		Bitboard black_bishop_BB = board->pieces(PieceType::BISHOP, Color::BLACK);
+		Bitboard black_rook_BB = board->pieces(PieceType::ROOK, Color::BLACK);
+		Bitboard black_queen_BB = board->pieces(PieceType::QUEEN, Color::BLACK);
+
+		float phase = blackPhase(black_knight_BB, black_bishop_BB, black_rook_BB, black_queen_BB);
+
+		return (int)((phase * (PSQT[C_BLACK][MG][ROOK][m.to().index()] - PSQT[C_BLACK][MG][ROOK][m.from().index()]) + (1 - phase) * (PSQT[C_BLACK][EG][ROOK][m.to().index()] - PSQT[C_BLACK][EG][ROOK][m.from().index()])));
 	}
 	if (p == Piece::BLACKQUEEN) {
-		return PSQT[C_BLACK][MG][QUEEN][m.to().index()] - PSQT[C_BLACK][MG][QUEEN][m.from().index()];
+
+		Bitboard black_knight_BB = board->pieces(PieceType::KNIGHT, Color::BLACK);
+		Bitboard black_bishop_BB = board->pieces(PieceType::BISHOP, Color::BLACK);
+		Bitboard black_rook_BB = board->pieces(PieceType::ROOK, Color::BLACK);
+		Bitboard black_queen_BB = board->pieces(PieceType::QUEEN, Color::BLACK);
+
+		float phase = blackPhase(black_knight_BB, black_bishop_BB, black_rook_BB, black_queen_BB);
+
+		return (int)((phase * (PSQT[C_BLACK][MG][QUEEN][m.to().index()] - PSQT[C_BLACK][MG][QUEEN][m.from().index()]) + (1 - phase) * (PSQT[C_BLACK][EG][QUEEN][m.to().index()] - PSQT[C_BLACK][EG][QUEEN][m.from().index()])));
 	}
 	if (p == Piece::BLACKKING) {
-
 
 		Bitboard black_knight_BB = board->pieces(PieceType::KNIGHT, Color::BLACK);
 		Bitboard black_bishop_BB = board->pieces(PieceType::BISHOP, Color::BLACK);
