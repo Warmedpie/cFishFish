@@ -2,7 +2,7 @@
 
 //Piece values by phase
 
-static int mgPieceValues[5] = { 82, 337, 365, 477, 1025 };
+static int mgPieceValues[5] = { 82, 337, 365, 497, 1025 };
 static int egPieceValues[5] = { 94, 281, 297, 512,  936 };
 
 //Adjustment values by pawn count for knights and bishops
@@ -538,7 +538,7 @@ int Eval::evaluate(Board* board, int search_time) {
 	//Defenders
 	Bitboard large_white_ring = kingRing(whiteKing + 8) | kingRing(whiteKing - 8) | white_ring;
 	Bitboard large_black_ring = kingRing(blackKing + 8) | kingRing(blackKing - 8) | black_ring;
-	
+
 	int white_defenders = 0;
 	int black_defenders = 0;
 
@@ -977,7 +977,7 @@ int Eval::evaluate(Board* board, int search_time) {
 	Bitboard black_vison = black_vison_pawn | black_vison_knight | black_vison_bishop | black_vison_rook | black_vison_queen;
 
 	//Max 10, min 1/10;
-	float white_imbalance = std::max(0.50f, std::min(1.5f,(float)(((float)imbalance_total_white + 1) / ((float)imbalance_total_black + 1))));
+	float white_imbalance = std::max(0.50f, std::min(1.5f, (float)(((float)imbalance_total_white + 1) / ((float)imbalance_total_black + 1))));
 	float black_imbalance = std::max(0.50f, std::min(1.5f, (float)(((float)imbalance_total_black + 1) / ((float)imbalance_total_white + 1))));
 
 
@@ -1167,35 +1167,35 @@ int Eval::evaluate(Board* board, int search_time) {
 		//More attackers + bigger attackers
 		(attack_white_count * attack_white_weight) +
 		//Squares we are attacking near king
-		(69 * attack_squares_white) +
+		(48 * attack_squares_white) +
 		//Safe checks on the king
 		check_score_white +
 		//Squares with only a king defender in the king ring
-		(105 * (bonus_white_weak + weak_black)) -
+		(130 * (bonus_white_weak + weak_black)) -
 		//Score of pawns covering the king
 		(black_shield * 50) -
 		//Pieces close to black king
-		(black_defenders) -
+		(black_defenders)-
 		//Using a knight defending king
 		(defender_black_knight * 45) : 0;
 
 	//Mate is less likely without a queen
 	if (white_queens == 0)
-		attack_score_white  -= 300;
+		attack_score_white -= 300;
 
 	int attack_score_black = bonus_attacker_black + attack_black_count > 1 ?
 		//More attackers + bigger attackers
 		(attack_black_count * attack_black_weight) +
 		//Squares we are attacking near king
-		(69 * attack_squares_black) +
+		(48 * attack_squares_black) +
 		//Safe checks on the king
 		check_score_black +
 		//Squares with only a king defender in the king ring
-		(105 * (bonus_black_weak + weak_white)) -
+		(130 * (bonus_black_weak + weak_white)) -
 		//Score of pawns covering the king
 		(white_shield * 50) -
 		//Pieces close to white king
-		(white_defenders) -
+		(white_defenders)-
 		//Using a knight defending king
 		(defender_white_knight * 45) : 0;
 

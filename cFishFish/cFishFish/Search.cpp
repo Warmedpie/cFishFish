@@ -14,8 +14,6 @@ int Search::entryPoint(int alpha, int beta, int depth, int ply_deep, std::vector
     if (winLossDraw < 1)
         return winLossDraw;
 
-    int alpha_orig = alpha;
-
     entry node = TT.transposition_search(board->zobrist());
 
     Move multi_move = multipv[ignore.size()];
@@ -43,51 +41,20 @@ int Search::entryPoint(int alpha, int beta, int depth, int ply_deep, std::vector
 
         board->makeMove(move);
 
-        int score = 0;
-
-        if (i == 0) {
-            score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, {move, capture});
-        }
-        else {
-            //Search with a null window until alpha improves
-            score = -PVS(-alpha - 1, -alpha, depth - 1, ply_deep + 1, { move, capture });
-
-            //re-search required
-            if (score > alpha && beta - alpha > 1) {
-                score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, { move, capture });
-            }
-        }
+        int score = -PVS(-beta, -alpha, depth - 1, ply_deep + 1, { move, capture });
 
         board->unmakeMove(move);
 
         if (score > alpha) {
             alpha = score;
             best_move = move;
-
-            //Fail-hard beta cut-off
-            if (alpha >= beta) {
-                break;
-            }
-
         }
 
         i++;
 
     }
 
-
-    nodeType type = EXACT;
-
-    //Fail-high (Cut-node)
-    if (alpha >= beta) {
-        type = CUT;
-    }
-    //Fail Low (All-node)
-    else if (alpha == alpha_orig) {
-        type = ALL;
-    }
-
-    entry insert_node = { depth, type, best_move, alpha };
+    entry insert_node = { depth, EXACT, best_move, alpha };
 
     if (ignore.size() == 0)
         TT.transposition_entry(board->zobrist(), insert_node);
