@@ -23,8 +23,6 @@ int Search::entryPoint(int alpha, int beta, int depth, int ply_deep, std::vector
     if (contains(ignore, table_move))
         table_move = multi_move;
 
-    int i = 0;
-
     Move counter_killer = TT.transposition_search_no_adjust((long)(prev.to().index() * 64 + prev.from().index())).best;
 
     //Order Moves
@@ -49,8 +47,6 @@ int Search::entryPoint(int alpha, int beta, int depth, int ply_deep, std::vector
             alpha = score;
             best_move = move;
         }
-
-        i++;
 
     }
 
@@ -184,12 +180,12 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, MOVE prev) {
             board->makeMove(move);
 
             int score = 0;
+
             //Late move reductions
             //Do not reduce when in check
             //do not reduce moves that are checks
-
             int LMR = 0;
-            if (!inCheck && !board->inCheck()) {
+            if (depth >= 2 && i > 1 && !inCheck && !board->inCheck()) {
                 //Equal value captures
                 if (scoredMove.score < 10000) {
                     LMR = (int)(0.5 + std::log(depth) * std::log(i) / 2.9);
@@ -250,7 +246,7 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, MOVE prev) {
                 //Do not reduce when in check
                 //do not reduce moves that are checks
                 int LMR = 0;
-                if (!inCheck && !board->inCheck()) {
+                if (depth >= 2 && i > 1 && !inCheck && !board->inCheck()) {
                     LMR = (int)(0.7844 + std::log(depth) * std::log(i) / 2.4696);
                 }
 
@@ -326,8 +322,8 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, MOVE prev) {
                 //Do not reduce when in check
                 //do not reduce moves that are checks
                 int LMR = 0;
-                if (!inCheck && !board->inCheck()) {
-                    LMR = (int)(0.7844 + std::log(depth) * std::log(i) / 2.4696) + 1;
+                if (depth >= 2 && i > 1 && !inCheck && !board->inCheck()) {
+                    LMR = (int)(0.7844 + std::log(depth) * std::log(i) / 2.4696);
                 }
 
                 if (i == 0) {
@@ -552,6 +548,29 @@ std::vector<ScoredMove> Search::orderAll(Move table, int depth, Move counter) {
 
         }
 
+        //Internal iterative deepening
+        if (depth > 3) {
+            ScoredMove sm = {0 ,0};
+            for (int d = 1; d < depth / 3; d++) {
+
+                board->makeMove(m);
+
+                int score = -entryPoint(-99999999, 99999999, d, 0, {}, m);
+
+                board->unmakeMove(m);
+
+                sm.score = score;
+                sm.move = m;
+
+            }
+
+            if (sm.move != 0) {
+                orderedMoves[i++] = sm;
+                continue;
+            }
+
+        }
+
         int score = Eval::PsqM(board, m);
 
         if (board->at(m.to()) != Piece::NONE) {
@@ -577,17 +596,17 @@ std::vector<ScoredMove> Search::orderAll(Move table, int depth, Move counter) {
         else {
 
             if (killer_move[depth] == m) {
-                score += 3200;
+                score += 300;
             }
             else if (killer_move[depth + 1] == m) {
-                score += 3100;
+                score += 200;
             }
             else if (depth > 1 && killer_move[depth - 1] == m) {
-                score += 3000;
+                score += 100;
             }
 
             else if (m == counter) {
-                score += 4000;
+                score += 50;
             }
 
             score += history_hueristic[m.from().index()][m.to().index()];
