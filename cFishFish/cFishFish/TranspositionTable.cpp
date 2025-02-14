@@ -19,6 +19,8 @@ void TranspositionTable::transposition_entry(uint64_t h, entry e) {
 }
 */
 
+constexpr entry no_hash = { -1, NOTYPE, 0, 0, 0 };
+
 entry TranspositionTable::transposition_search_no_adjust(uint64_t h) {
 	return this->table[h];
 }

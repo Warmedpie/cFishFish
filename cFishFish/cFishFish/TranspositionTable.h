@@ -21,8 +21,6 @@ private:
 
 	std::unordered_map<uint64_t, entry> transposition_table;
 
-	entry no_hash = { -1, NOTYPE, 0, 0, 0 };
-
 	uint64_t table_byte_size = 128 * 1024 * 1024;
 	std::vector<entry> table;
 	uint64_t get_index(uint64_t key) {

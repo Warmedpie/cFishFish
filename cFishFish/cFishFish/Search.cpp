@@ -1,5 +1,7 @@
 #include "Search.h"
 
+constexpr int order_score[13] = { 82, 337, 365, 477, 1025, 0, 82, 337, 365, 477, 1025, 0, 0 };
+
 int Search::entryPoint(int alpha, int beta, int depth, int ply_deep, std::vector<Move> ignore, Move prev) {
 
     if (checkTimeout())

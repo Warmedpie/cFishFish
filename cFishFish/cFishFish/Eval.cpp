@@ -2,15 +2,15 @@
 
 //Piece values by phase
 
-static int mgPieceValues[5] = { 82, 337, 365, 497, 1025 };
-static int egPieceValues[5] = { 94, 281, 297, 512,  936 };
+constexpr int mgPieceValues[5] = { 82, 337, 365, 497, 1025 };
+constexpr int egPieceValues[5] = { 94, 281, 297, 512,  936 };
 
 //Adjustment values by pawn count for knights and bishops
-static const int knightAdj[9] = { -20, -16, -12, -8, -4,  0,  4,  8, 12 };
-static const int rookAdj[9] = { 15,  12,   9,  6,  3,  0, -3, -6, -9 };
+constexpr int knightAdj[9] = { -20, -16, -12, -8, -4,  0,  4,  8, 12 };
+constexpr int rookAdj[9] = { 15,  12,   9,  6,  3,  0, -3, -6, -9 };
 
 //COLOR PHASE PIECE TYPE SQUARE
-static const int PSQT[2][2][6][64] = {
+constexpr int PSQT[2][2][6][64] = {
 
 	//WHITE TABLES
 	{
@@ -301,12 +301,12 @@ static const int PSQT[2][2][6][64] = {
 	}
 };
 
-static const int isolated_penality[8] = { -12, -16, -16, -18, -19, -15, -14, -17 };
-static const int passed_bonus_mg[8] = { 0, 10, 17, 22, 31, 84, 137 };
-static const int passed_bonus_eg[8] = { 0, 13, 23, 29, 42, 105, 171 };
+constexpr int isolated_penality[8] = { -12, -16, -16, -18, -19, -15, -14, -17 };
+constexpr int passed_bonus_mg[8] = { 0, 10, 17, 22, 31, 84, 137 };
+constexpr int passed_bonus_eg[8] = { 0, 13, 23, 29, 42, 105, 171 };
 
 //Piece square tables
-static const int mateTableKing[64] = {
+constexpr int mateTableKing[64] = {
 		-1000, -500, -500, -500, -500, -500, -500, -1000,
 		-500, -500, -300, -300, -300, -300, -500, -500,
 		-500, -300, -200, -200, -200, -200, -300, -500,
@@ -317,7 +317,7 @@ static const int mateTableKing[64] = {
 		-1000, -500, -500, -500, -500, -500, -500, -1000,
 };
 
-static const int CENTER_MANHATTAN_DISTANCE[64] = {
+constexpr int CENTER_MANHATTAN_DISTANCE[64] = {
 		6, 5, 4, 3, 3, 4, 5, 6,
 		5, 4, 3, 2, 2, 3, 4, 5,
 		4, 3, 2, 1, 1, 2, 3, 4,
