@@ -230,6 +230,8 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, MOVE prev) {
 
         }
 
+        int q = 0;
+
         //Quiet moves
         if (alpha < beta) {
             Move threat_killer = TT.transposition_search_no_adjust((long)(threat_move.to().index() * 64 + threat_move.from().index())).best;
@@ -249,7 +251,7 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, MOVE prev) {
                 //do not reduce moves that are checks
                 int LMR = 0;
                 if (depth >= 2 && i > 1 && !inCheck && !board->inCheck()) {
-                    LMR = (int)(0.7844 + std::log(depth) * std::log(i) / 2.4696);
+                    LMR = (int)(0.7844 + std::log(depth) * std::log(q) / 2.4696);
                 }
 
                 Piece from = board->at(move.from());
@@ -304,6 +306,7 @@ int Search::PVS(int alpha, int beta, int depth, int ply_deep, MOVE prev) {
                 }
 
                 i++;
+                q++;
             }
 
         }
