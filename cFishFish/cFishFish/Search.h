@@ -45,7 +45,6 @@ public:
 		this->search_time = search_time;
 		this->board = b;
 		this->nodes = 0;
-		TT.clear();
 
 		for (int i = 0; i < 64; i++) {
 			if (i < 10)
@@ -71,8 +70,6 @@ public:
 	int entryPoint(int alpha, int beta, int depth, int plydeep, std::vector<Move> ignore, Move prev);
 	int PVS(int alpha, int beta, int depth, int plydeep, MOVE prev);
 	int qSearch(int alpha, int beta, int depth);
-
-	bool nodeTableBreak(entry node, int depth, int alpha, int beta);
 
 	int mateScore(int plydeep);
 	bool hasLegalMoves();
@@ -150,5 +147,6 @@ public:
 	inline void table_size(int size) {
 		TT.set_table(size);
 	}
+
 
 };

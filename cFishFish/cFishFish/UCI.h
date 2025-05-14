@@ -4,7 +4,6 @@
 #include "Search.h"
 #include "Book.h"
 #include "Eval.h"
-#include "TranspositionTable.h"
 
 #include <string>
 #include <regex>
