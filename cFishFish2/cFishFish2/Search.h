@@ -9,7 +9,8 @@
 // heuristic, then losing captures (by static exchange evaluation, SEE).
 // Quiescence search: losing captures skipped, delta pruning.
 // Selectivity: check extension, reverse futility pruning, null-move pruning,
-// late move reductions.
+// ProbCut, late move pruning, late move reductions. The last five use the
+// "improving" flag (static eval better than on our previous move).
 
 #pragma once
 
@@ -19,6 +20,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -192,6 +194,49 @@ private:
     std::array<std::array<std::array<int, 64>, 64>, 2> table_{};
 };
 
+// Same gravity update for the 16-bit tables below.
+inline void update_stat(std::int16_t& h, int bonus) {
+    bonus = std::clamp(bonus, -MaxHistory, MaxHistory);
+    const int v = h;
+    h = static_cast<std::int16_t>(v + bonus - v * std::abs(bonus) / MaxHistory);
+}
+
+// (piece, to-square) key for a move: 0..767, or -1 for "no move" (null move,
+// root). Castling uses the king's from/to encoding of the library, which
+// is consistent, so it works as a key too.
+inline int piece_to(const chess::Board& b, const chess::Move& m) {
+    return static_cast<int>(b.at(m.from()).internal()) * 64 + m.to().index();
+}
+
+// All move-ordering statistics. Owned by the UCI layer so they survive from
+// one move of the game to the next (cleared on ucinewgame); a Searcher made
+// without one creates its own.
+struct OrderTables {
+    History main;  // [color][from][to]
+    // Capture history: [moving piece][to][captured type]. Refines MVV-LVA by
+    // which captures actually worked in this game.
+    std::array<std::array<std::array<std::int16_t, 6>, 64>, 12> capture{};
+    // Continuation history: [previous move's piece-to][this move's piece-to].
+    // "After the opponent played Nf6, h3 tends to be good." Used with the
+    // moves 1 ply ago (counter-move history) and 2 plies ago (follow-up).
+    std::vector<std::int16_t> cont = std::vector<std::int16_t>(768 * 768);
+    // Countermove: the quiet move that last refuted the opponent's piece-to.
+    std::array<chess::Move, 768> counter{};
+
+    std::int16_t& cont_at(int prev, int cur) { return cont[static_cast<std::size_t>(prev * 768 + cur)]; }
+    int cont_get(int prev, int cur) const {
+        return prev < 0 ? 0 : cont[static_cast<std::size_t>(prev * 768 + cur)];
+    }
+    std::int16_t& capture_at(const chess::Board& b, const chess::Move& m) {
+        const int victim = m.typeOf() == chess::Move::ENPASSANT ? 0 : static_cast<int>(b.at(m.to()).type().internal());
+        return capture[static_cast<std::size_t>(b.at(m.from()).internal())][static_cast<std::size_t>(m.to().index())]
+                      [static_cast<std::size_t>(victim)];
+    }
+    int capture_get(const chess::Board& b, const chess::Move& m) const {
+        return const_cast<OrderTables*>(this)->capture_at(b, m);
+    }
+};
+
 // Moves plus their order scores. next() does one step of selection sort:
 // only as much sorting as the search actually uses before a cutoff.
 struct OrderedMoves {
@@ -224,6 +269,125 @@ inline constexpr int RfpMargin   = 80;
 inline constexpr int NmpMinDepth = 3;
 inline constexpr int NmpBase     = 3;
 inline constexpr int NmpDiv      = 6;
+
+// ---- "Improving" and the heuristics that use it ----------------------------
+// improving = our static eval is higher than it was two plies ago (our
+// previous move). If improving, the position is trending our way, so we can
+// prune more aggressively toward fail-highs and reduce less.
+// The SR_* macros exist so A/B test builds can flip features from the
+// command line; normal builds use the defaults.
+//
+// Timed A/B results (25 ms/move with 5 ms overhead, vs. the version before):
+//   LMP, Stockfish limit (3+d^2)/(2-imp)     -250-ish (aborted), with checks kept: similar
+//   LMP, same limit, depth <= 3 only           -32  (400 games)
+//   LMP, limit x2, checks kept                 +23  (400, LOS 95%)   ON
+//   then, each on top of that LMP:
+//   RFP margin by improving                     -2  (600)            off
+//   LMR +1 when not improving                   +3  (600)            off
+//   NMP below beta when improving               -1  (600)            off
+//   ProbCut                                     -4  (600)            off
+//   all four together                           +7  (800, LOS 77%)   off: not proven
+// The four are standard small gains in strong engines; they need an SPRT
+// run of thousands of games to resolve. Aggressive LMP likely fails here
+// because quiet-move ordering is still basic (no continuation history).
+#ifndef SR_IMP_RFP
+#define SR_IMP_RFP 0
+#endif
+#ifndef SR_LMP
+#define SR_LMP 1
+#endif
+#ifndef SR_IMP_LMR
+#define SR_IMP_LMR 0
+#endif
+#ifndef SR_IMP_NMP
+#define SR_IMP_NMP 0
+#endif
+#ifndef SR_PROBCUT
+#define SR_PROBCUT 0
+#endif
+#ifndef SR_LMP_KEEP_CHECKS
+#define SR_LMP_KEEP_CHECKS 1
+#endif
+inline constexpr bool UseImprovingRfp = SR_IMP_RFP;  // RFP margin: RfpMargin * (depth - improving)
+inline constexpr bool UseLmp          = SR_LMP;      // late move pruning, limit depends on improving
+inline constexpr bool UseImprovingLmr = SR_IMP_LMR;  // +1 reduction when not improving
+inline constexpr bool UseImprovingNmp = SR_IMP_NMP;  // NMP also when eval >= beta - margin and improving
+inline constexpr bool UseProbCut      = SR_PROBCUT;  // ProbCut, beta margin lower when improving
+inline constexpr bool LmpKeepChecks   = SR_LMP_KEEP_CHECKS;  // LMP never skips a move that gives check
+
+// Late move pruning: at depth <= LmpMaxDepth, quiet moves after the first
+// (3 + depth^2) / (2 - improving) are skipped.
+#ifndef SR_LMP_MAX_DEPTH
+#define SR_LMP_MAX_DEPTH 8
+#endif
+#ifndef SR_LMP_SCALE
+#define SR_LMP_SCALE 2
+#endif
+inline constexpr int LmpMaxDepth = SR_LMP_MAX_DEPTH;
+inline int lmp_limit(int depth, bool improving) {
+    return SR_LMP_SCALE * (3 + depth * depth) / (2 - (improving ? 1 : 0));
+}
+
+// ---- Move ordering statistics ------------------------------------------------
+// Timed A/B results (25 ms/move, 600 games each):
+//   vs. the version before (fresh, small-bonus history every move):
+//     capture history                           -7            off
+//     continuation history (1 and 2 ply)        +5
+//     countermove                               +9
+//     history bonus 16d^2+32d instead of d^2    +6
+//     keep tables between moves                +28 (LOS 99%)  ON
+//   then vs. keep-tables:
+//     continuation history + countermove        -7  (with the small d^2 bonus)
+//     big bonus                                +21 (LOS 97%)  ON
+//     big bonus + cont + counter + history LMR +37 (LOS 99.9%) ON: the package
+//     package vs. big bonus alone              +13 (LOS 87%)
+//     package + capture history                 -7            off
+// Continuation history and history-LMR need the larger bonus: with d^2 the
+// values stay too small to matter. Total over the old ordering: about +65.
+#ifndef SR_CAPT_HIST
+#define SR_CAPT_HIST 0
+#endif
+#ifndef SR_CONT_HIST
+#define SR_CONT_HIST 1
+#endif
+#ifndef SR_COUNTER
+#define SR_COUNTER 1
+#endif
+#ifndef SR_HIST_LMR
+#define SR_HIST_LMR 1
+#endif
+#ifndef SR_BIG_BONUS
+#define SR_BIG_BONUS 1
+#endif
+#ifndef SR_KEEP_HIST
+#define SR_KEEP_HIST 1
+#endif
+inline constexpr bool UseCaptureHistory = SR_CAPT_HIST;  // capture history on top of MVV
+inline constexpr bool UseContHistory    = SR_CONT_HIST;  // 1- and 2-ply continuation history
+inline constexpr bool UseCountermove    = SR_COUNTER;    // countermove after the killers
+inline constexpr bool UseHistoryLmr     = SR_HIST_LMR;   // reduce good-history quiets less
+inline constexpr bool KeepHistory       = SR_KEEP_HIST;  // tables survive between moves
+inline constexpr bool UseBigBonus       = SR_BIG_BONUS;  // history bonus 16d^2+32d (cap 1600) instead of d^2
+inline constexpr int OrderCounter    = 700'000;
+
+// History bonus for a cutoff at `depth` (penalty = the negative).
+inline int history_bonus(int depth) {
+    return UseBigBonus ? std::min(16 * depth * depth + 32 * depth, 1600) : depth * depth;
+}
+#ifndef SR_HIST_LMR_DIV
+#define SR_HIST_LMR_DIV 4096
+#endif
+inline constexpr int HistLmrDivisor  = SR_HIST_LMR_DIV;  // history units per ply of LMR
+
+inline constexpr int NmpImprovingMargin = 40;
+
+// ProbCut: at depth >= ProbCutMinDepth, a capture that beats
+// beta + ProbCutMargin (- ProbCutImproving if improving) in a search
+// reduced by ProbCutReduction probably beats beta at full depth too.
+inline constexpr int ProbCutMinDepth  = 5;
+inline constexpr int ProbCutReduction = 4;
+inline constexpr int ProbCutMargin    = 200;
+inline constexpr int ProbCutImproving = 50;
 
 // Delta pruning (quiescence search): skip a capture if stand pat + the
 // captured piece's value + DeltaMargin still can't reach alpha.
@@ -273,8 +437,14 @@ struct Result {
 
 class Searcher {
 public:
-    Searcher(const chess::Board& board, TranspositionTable& tt, Hooks hooks)
-        : board_(board), tt_(tt), hooks_(std::move(hooks)) {}
+    // `tables`: move-ordering statistics to use and keep updating (the UCI
+    // layer passes its own so they carry over between moves); nullptr = fresh.
+    Searcher(const chess::Board& board, TranspositionTable& tt, Hooks hooks, OrderTables* tables = nullptr)
+        : board_(board), tt_(tt), hooks_(std::move(hooks)),
+          own_tables_(tables ? nullptr : std::make_unique<OrderTables>()),
+          ot_(tables ? *tables : *own_tables_) {
+        moved_.fill(-1);
+    }
 
     // Iterative deepening at the root.
     // `allowed` : root moves to consider (UCI searchmoves); empty = all legal.
@@ -353,7 +523,8 @@ private:
         // TT probe. Cut off only in non-PV nodes so the PV stays complete.
         chess::Move tt_move(chess::Move::NO_MOVE);
         TTEntry entry;
-        if (tt_.probe(key, entry)) {
+        const bool tt_hit = tt_.probe(key, entry);
+        if (tt_hit) {
             tt_move = chess::Move(entry.move);
             if (!pv_node && entry.depth >= depth) {
                 const Score s = score_from_tt(entry.score, ply);
@@ -367,26 +538,74 @@ private:
         // Static evaluation, used by the pruning below. Not meaningful in check.
         const Score static_eval = in_check ? -Infinite : eval::evaluate(board_);
 
+        // Improving: is our eval better than on our previous move (two plies
+        // ago)? Falls back to four plies if that position was in check.
+        eval_stack_[static_cast<std::size_t>(ply)] = in_check ? NoEval : static_eval;
+        bool improving = false;
+        if (!in_check) {
+            if (ply >= 2 && eval_stack_[static_cast<std::size_t>(ply - 2)] != NoEval)
+                improving = static_eval > eval_stack_[static_cast<std::size_t>(ply - 2)];
+            else if (ply >= 4 && eval_stack_[static_cast<std::size_t>(ply - 4)] != NoEval)
+                improving = static_eval > eval_stack_[static_cast<std::size_t>(ply - 4)];
+            else
+                improving = true;
+        }
+
         if (!pv_node && !in_check) {
             // Reverse futility pruning (static null move): at shallow depth,
             // if we are so far above beta that even losing margin * depth
             // wouldn't bring us back under it, assume the node fails high.
+            // When improving, a smaller margin is enough.
+            const int rfp_depth = depth - (UseImprovingRfp && improving ? 1 : 0);
             if (depth <= RfpMaxDepth && !is_mate_score(beta) &&
-                static_eval - RfpMargin * depth >= beta)
+                static_eval - RfpMargin * rfp_depth >= beta)
                 return static_eval;
 
             // Null-move pruning: give the opponent a free move. If a reduced
             // search still fails high, a real move would too. Skipped without
             // pieces (pawn endgames), where zugzwang makes passing an
-            // advantage and the assumption breaks.
-            if (null_ok && depth >= NmpMinDepth && static_eval >= beta && !is_mate_score(beta) &&
+            // advantage and the assumption breaks. When improving, also tried
+            // with the eval slightly below beta.
+            const bool nmp_eval_ok =
+                static_eval >= beta ||
+                (UseImprovingNmp && improving && static_eval >= beta - NmpImprovingMargin);
+            if (null_ok && depth >= NmpMinDepth && nmp_eval_ok && !is_mate_score(beta) &&
                 board_.hasNonPawnMaterial(board_.sideToMove())) {
                 const int r = NmpBase + depth / NmpDiv;
+                moved_[static_cast<std::size_t>(ply)] = -1;
                 board_.makeNullMove();
                 const Score score = -pvs(depth - 1 - r, ply + 1, -beta, -beta + 1, false);
                 board_.unmakeNullMove();
                 if (stopped_) return 0;
                 if (score >= beta) return is_mate_score(score) ? beta : score;  // don't trust null-move mates
+            }
+
+            // ProbCut: if a good capture beats a raised beta in a much
+            // shallower search, it very likely beats beta at full depth.
+            if (UseProbCut && depth >= ProbCutMinDepth && !is_mate_score(beta)) {
+                const Score pc_beta = beta + ProbCutMargin - (improving ? ProbCutImproving : 0);
+                // Skip if the TT already says this position is below pc_beta.
+                const bool tt_says_low = tt_hit && entry.depth >= depth - ProbCutReduction + 1 &&
+                                         score_from_tt(entry.score, ply) < pc_beta;
+                if (!tt_says_low) {
+                    OrderedMoves caps;
+                    chess::movegen::legalmoves<chess::movegen::MoveGenType::CAPTURE>(caps.moves, board_);
+                    score_moves(caps, tt_move, ply);
+                    for (int i = 0; i < caps.size(); ++i) {
+                        const chess::Move move = caps.next(i);
+                        if (!see_ge(board_, move, pc_beta - static_eval)) continue;
+                        make(move, ply);
+                        Score score = -qsearch(ply + 1, -pc_beta, -pc_beta + 1);
+                        if (score >= pc_beta)
+                            score = -pvs(depth - 1 - ProbCutReduction, ply + 1, -pc_beta, -pc_beta + 1, true);
+                        board_.unmakeMove(move);
+                        if (stopped_) return 0;
+                        if (score >= pc_beta) {
+                            tt_.store(key, move, score_to_tt(score, ply), depth - ProbCutReduction, Bound::Lower);
+                            return score;
+                        }
+                    }
+                }
             }
         }
 
@@ -410,14 +629,28 @@ private:
         // history penalty if a later quiet move does.
         std::array<chess::Move, 64> quiets_tried;
         int quiet_count = 0;
+        std::array<chess::Move, 32> captures_tried;
+        int capture_count = 0;
 
         for (int i = 0; i < list.size(); ++i) {
             const chess::Move move = list.next(i);
             if (ply == 0 && !root_move_allowed(move)) continue;
             const bool quiet = is_quiet(board_, move);
 
-            board_.makeMove(move);
+            // Late move pruning: at shallow depth, once enough moves have been
+            // searched, skip the remaining quiet moves (ordered last, rarely
+            // best). Fewer are searched when not improving.
+            const bool lmp_skip = UseLmp && ply > 0 && !in_check && quiet && depth <= LmpMaxDepth &&
+                                  best > -(Mate - MaxPly) && moves_searched >= lmp_limit(depth, improving);
+            if (lmp_skip && !LmpKeepChecks) continue;
+
+            const int move_hist = quiet ? quiet_history(move, ply) : 0;  // before the move is made
+            make(move, ply);
             const bool gives_check = board_.inCheck();
+            if (lmp_skip && !gives_check) {  // (LmpKeepChecks) checks are still searched
+                board_.unmakeMove(move);
+                continue;
+            }
             const int new_depth = depth - 1;
             Score score;
             if (moves_searched == 0) {
@@ -431,6 +664,8 @@ private:
                     !gives_check) {
                     r = lmr_reduction(depth, moves_searched + 1);
                     if (pv_node) --r;
+                    if (UseImprovingLmr && !improving) ++r;
+                    if (UseHistoryLmr) r -= move_hist / HistLmrDivisor;
                     r = std::clamp(r, 0, new_depth - 1);
                 }
 
@@ -453,12 +688,20 @@ private:
                     update_pv(ply, move);
                     if (alpha >= beta) {  // fail high (beta cutoff)
                         if (quiet) on_quiet_cutoff(move, ply, depth, quiets_tried, quiet_count);
+                        else if (UseCaptureHistory && is_capture_stat(move))
+                            update_stat(ot_.capture_at(board_, move), history_bonus(depth));
+                        if (UseCaptureHistory)  // captures that were tried first didn't work
+                            for (int k = 0; k < capture_count; ++k)
+                                update_stat(ot_.capture_at(board_, captures_tried[static_cast<std::size_t>(k)]),
+                                            -history_bonus(depth));
                         break;
                     }
                 }
             }
             if (quiet && quiet_count < static_cast<int>(quiets_tried.size()))
                 quiets_tried[static_cast<std::size_t>(quiet_count++)] = move;
+            else if (!quiet && is_capture_stat(move) && capture_count < static_cast<int>(captures_tried.size()))
+                captures_tried[static_cast<std::size_t>(capture_count++)] = move;
         }
 
         // Don't store the root while excluding MultiPV moves: that score is
@@ -540,7 +783,7 @@ private:
                 }
             }
 
-            board_.makeMove(move);
+            make(move, ply);
             const Score score = -qsearch(ply + 1, -beta, -alpha);
             board_.unmakeMove(move);
 
@@ -565,7 +808,6 @@ private:
 
     // Assign order scores to every move in the list.
     void score_moves(OrderedMoves& list, const chess::Move& tt_move, int ply) const {
-        const chess::Color us = board_.sideToMove();
         const auto& killers = killers_[static_cast<std::size_t>(ply)];
         for (int i = 0; i < list.size(); ++i) {
             const chess::Move m = list.moves[i];
@@ -578,13 +820,24 @@ private:
                 score = queen ? OrderCapture + eval::QueenValue * 8 + capture
                               : OrderUnderPromo + capture;
             } else if (!is_quiet(board_, m)) {
-                score = (see_ge(board_, m, 0) ? OrderCapture : OrderBadCapture) + mvv_lva(board_, m);
+                const int base = see_ge(board_, m, 0) ? OrderCapture : OrderBadCapture;
+                if (UseCaptureHistory) {
+                    const int victim = m.typeOf() == chess::Move::ENPASSANT
+                                           ? eval::PawnValue
+                                           : eval::PieceValueMG[static_cast<std::size_t>(board_.at(m.to()).type().internal())];
+                    score = base + victim * 8 + ot_.capture_get(board_, m) / 16;
+                } else {
+                    score = base + mvv_lva(board_, m);
+                }
             } else if (m == killers[0]) {
                 score = OrderKiller1;
             } else if (m == killers[1]) {
                 score = OrderKiller2;
+            } else if (UseCountermove && ply > 0 && moved_[static_cast<std::size_t>(ply - 1)] >= 0 &&
+                       m == ot_.counter[static_cast<std::size_t>(moved_[static_cast<std::size_t>(ply - 1)])]) {
+                score = OrderCounter;
             } else {
-                score = history_.get(us, m);
+                score = quiet_history(m, ply);
             }
             list.scores[static_cast<std::size_t>(i)] = score;
         }
@@ -600,10 +853,48 @@ private:
             killers[1] = killers[0];
             killers[0] = move;
         }
-        const chess::Color us = board_.sideToMove();
-        const int bonus = depth * depth;
-        history_.update(us, move, bonus);
-        for (int i = 0; i < tried_count; ++i) history_.update(us, tried[static_cast<std::size_t>(i)], -bonus);
+        const int bonus = history_bonus(depth);
+        update_quiet(move, ply, bonus);
+        for (int i = 0; i < tried_count; ++i) update_quiet(tried[static_cast<std::size_t>(i)], ply, -bonus);
+        if (UseCountermove && ply > 0 && moved_[static_cast<std::size_t>(ply - 1)] >= 0)
+            ot_.counter[static_cast<std::size_t>(moved_[static_cast<std::size_t>(ply - 1)])] = move;
+    }
+
+    // Piece-to keys of the moves 1 and 2 plies before `ply` (-1 if none).
+    int prev_move(int ply, int back) const {
+        return ply >= back ? moved_[static_cast<std::size_t>(ply - back)] : -1;
+    }
+
+    // Order score of a quiet move: butterfly history plus, if enabled, the
+    // continuation history after the last two moves.
+    int quiet_history(const chess::Move& m, int ply) const {
+        int h = ot_.main.get(board_.sideToMove(), m);
+        if (UseContHistory) {
+            const int pt = piece_to(board_, m);
+            h += ot_.cont_get(prev_move(ply, 1), pt) + ot_.cont_get(prev_move(ply, 2), pt);
+        }
+        return h;
+    }
+
+    void update_quiet(const chess::Move& m, int ply, int bonus) {
+        ot_.main.update(board_.sideToMove(), m, bonus);
+        if (UseContHistory) {
+            const int pt = piece_to(board_, m);
+            for (int back = 1; back <= 2; ++back) {
+                const int prev = prev_move(ply, back);
+                if (prev >= 0) update_stat(ot_.cont_at(prev, pt), bonus);
+            }
+        }
+    }
+
+    // Captures tracked by capture history (not promotions: those have their
+    // own band and piece type changes).
+    static bool is_capture_stat(const chess::Move& m) { return m.typeOf() != chess::Move::PROMOTION; }
+
+    // Make a move and remember its piece-to key for continuation history.
+    void make(const chess::Move& m, int ply) {
+        moved_[static_cast<std::size_t>(ply)] = piece_to(board_, m);
+        board_.makeMove(m);
     }
 
     bool check_time() {
@@ -638,7 +929,14 @@ private:
 
     // Killer moves: two quiet moves per ply that recently caused cutoffs.
     std::array<std::array<chess::Move, 2>, MaxPly + 1> killers_{};
-    History history_;
+    std::unique_ptr<OrderTables> own_tables_;  // only when none was passed in
+    OrderTables& ot_;
+    // moved_[ply]: piece-to key of the move made at `ply` (-1 = null move).
+    std::array<int, MaxPly + 1> moved_{};
+
+    // Static eval per ply, for the "improving" flag (NoEval when in check).
+    static constexpr Score NoEval = Infinite + 1;
+    std::array<Score, MaxPly + 1> eval_stack_{};
 
     std::array<std::array<chess::Move, MaxPly + 1>, MaxPly + 1> pv_{};
     std::array<int, MaxPly + 1> pv_len_{};

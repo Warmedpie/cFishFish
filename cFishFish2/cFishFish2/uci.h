@@ -381,6 +381,7 @@ struct SearchContext {
     std::atomic<bool>& pondering;  // true until "ponderhit"
     std::atomic<TimeMs>& start;    // reset on "ponderhit"
     search::TranspositionTable& tt;
+    search::OrderTables* tables;   // move-ordering stats kept between moves (nullptr = fresh each search)
 
     TimeMs elapsed() const { return now_ms() - start.load(); }
 
@@ -469,7 +470,7 @@ inline SearchResult run_search(SearchContext& ctx) {
 
     // Heap-allocated: the searcher holds a PV table too big for comfort on a
     // thread stack.
-    auto searcher = std::make_unique<search::Searcher>(board, ctx.tt, std::move(hooks));
+    auto searcher = std::make_unique<search::Searcher>(board, ctx.tt, std::move(hooks), ctx.tables);
     const search::Result r = searcher->iterate(allowed, ctx.multipv());
 
     if (r.best == chess::Move::NO_MOVE) {
@@ -514,7 +515,7 @@ public:
 
         if      (cmd == "uci")        cmd_uci();
         else if (cmd == "isready")    send("readyok");
-        else if (cmd == "ucinewgame") { stop_search(); position_ = {}; tt_.clear(); }
+        else if (cmd == "ucinewgame") { stop_search(); position_ = {}; tt_.clear(); tables_ = std::make_unique<search::OrderTables>(); }
         else if (cmd == "setoption")  cmd_setoption(is);
         else if (cmd == "position")   { stop_search(); cmd_position(is); }
         else if (cmd == "go")         cmd_go(is);
@@ -1011,7 +1012,8 @@ private:
         worker_ = std::thread([this, pos = position_, opts = options_,
                                lim = std::move(lim), budget]() mutable {
             SearchContext ctx{std::move(pos), std::move(lim), opts, budget,
-                              stop_, pondering_, start_ms_, tt_};
+                              stop_, pondering_, start_ms_, tt_,
+                              search::KeepHistory ? tables_.get() : nullptr};
             SearchResult res = run_search(ctx);
 
             // UCI: in "infinite" or "ponder" mode, bestmove must not be sent
@@ -1041,6 +1043,7 @@ private:
     PositionCmd position_;
     Options options_;
     search::TranspositionTable tt_{16};  // matches the Hash option default
+    std::unique_ptr<search::OrderTables> tables_ = std::make_unique<search::OrderTables>();
 
     std::thread worker_;
     std::atomic<bool> stop_{false};
