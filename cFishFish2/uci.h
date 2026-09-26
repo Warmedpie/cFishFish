@@ -56,7 +56,7 @@ namespace uci {
 // Engine identity / constants
 // ---------------------------------------------------------------------------
 inline constexpr std::string_view EngineName   = "cFishFish2";
-inline constexpr std::string_view EngineAuthor = "Alden";
+inline constexpr std::string_view EngineAuthor = "Warmedpie";
 inline constexpr std::string_view StartFen =
     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
