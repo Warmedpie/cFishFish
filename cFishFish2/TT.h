@@ -7,11 +7,18 @@
 // One entry per slot, table size is a power of two so indexing is a mask.
 // Replacement: a slot holding an older search's entry or a shallower result
 // is overwritten; a deeper entry from the current search is kept.
+//
+// Shared by all search threads without locks. Each slot is two 64-bit words,
+// the data and (key XOR data), written and read with relaxed atomics. If two
+// threads write a slot at the same time, or a read sees half of a write, the
+// key check fails and the entry is simply treated as missing.
 
 #pragma once
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
+#include <memory>
 #include <new>
 #include <vector>
 
@@ -45,24 +52,28 @@ public:
     void resize(std::size_t mb) {
         const std::size_t bytes = std::max<std::size_t>(mb, 1) * 1024 * 1024;
         std::size_t count = 1;
-        while (count * 2 * sizeof(TTEntry) <= bytes) count *= 2;
+        while (count * 2 * sizeof(Slot) <= bytes) count *= 2;
 
         for (;;) {
             try {
-                table_.assign(count, TTEntry{});
-                table_.shrink_to_fit();
+                table_.reset();
+                table_ = std::make_unique<Slot[]>(count);
                 break;
             } catch (const std::bad_alloc&) {
                 if (count <= 1024) throw;
                 count /= 2;  // not enough memory: try half the size
             }
         }
+        size_ = count;
         mask_ = count - 1;
-        generation_ = 1;
+        clear();
     }
 
     void clear() {
-        std::fill(table_.begin(), table_.end(), TTEntry{});
+        for (std::size_t i = 0; i < size_; ++i) {
+            table_[i].data.store(0, std::memory_order_relaxed);
+            table_[i].check.store(0, std::memory_order_relaxed);
+        }
         generation_ = 1;
     }
 
@@ -74,15 +85,18 @@ public:
 
     // Returns true and fills `out` if this key is in the table.
     bool probe(std::uint64_t key, TTEntry& out) const {
-        const TTEntry& e = table_[key & mask_];
-        if (e.key != key || e.bound == Bound::None) return false;
+        TTEntry e;
+        if (!read(key & mask_, e) || e.key != key || e.bound == Bound::None) return false;
         out = e;
         return true;
     }
 
     void store(std::uint64_t key, chess::Move move, eval::Score score, int depth, Bound bound) {
-        TTEntry& e = table_[key & mask_];
-        const bool same = (e.key == key);
+        const std::size_t i = key & mask_;
+        TTEntry e;
+        const bool valid = read(i, e);
+        const bool same = valid && (e.key == key);
+        if (!valid) e = TTEntry{};
 
         // Keep the old best move if this search didn't find one (fail low).
         std::uint16_t m = move.move();
@@ -98,21 +112,59 @@ public:
         e.depth = static_cast<std::int8_t>(std::clamp(depth, 0, 127));
         e.bound = bound;
         e.generation = generation_;
+        write(i, e);
     }
 
     // UCI "hashfull": permille of the first 1000 slots used by this search.
     int hashfull() const {
-        const std::size_t n = std::min<std::size_t>(1000, table_.size());
+        const std::size_t n = std::min<std::size_t>(1000, size_);
         int used = 0;
-        for (std::size_t i = 0; i < n; ++i)
-            if (table_[i].bound != Bound::None && table_[i].generation == generation_) ++used;
+        for (std::size_t i = 0; i < n; ++i) {
+            TTEntry e;
+            if (read(i, e) && e.bound != Bound::None && e.generation == generation_) ++used;
+        }
         return static_cast<int>(used * 1000 / n);
     }
 
-    std::size_t size() const { return table_.size(); }
+    std::size_t size() const { return size_; }
 
 private:
-    std::vector<TTEntry> table_;
+    struct Slot {
+        std::atomic<std::uint64_t> data{0};   // move | score | depth | bound | generation
+        std::atomic<std::uint64_t> check{0};  // key ^ data
+    };
+
+    static std::uint64_t pack(const TTEntry& e) {
+        return static_cast<std::uint64_t>(e.move) |
+               static_cast<std::uint64_t>(static_cast<std::uint16_t>(e.score)) << 16 |
+               static_cast<std::uint64_t>(static_cast<std::uint8_t>(e.depth)) << 32 |
+               static_cast<std::uint64_t>(static_cast<std::uint8_t>(e.bound)) << 40 |
+               static_cast<std::uint64_t>(e.generation) << 48;
+    }
+
+    // Reads slot i; false if it is empty. e.key is recovered from the check
+    // word, so a torn read yields a key that won't match the one probed.
+    bool read(std::size_t i, TTEntry& e) const {
+        const std::uint64_t d = table_[i].data.load(std::memory_order_relaxed);
+        const std::uint64_t c = table_[i].check.load(std::memory_order_relaxed);
+        if (d == 0 && c == 0) return false;
+        e.key = c ^ d;
+        e.move = static_cast<std::uint16_t>(d);
+        e.score = static_cast<std::int16_t>(static_cast<std::uint16_t>(d >> 16));
+        e.depth = static_cast<std::int8_t>(static_cast<std::uint8_t>(d >> 32));
+        e.bound = static_cast<Bound>(static_cast<std::uint8_t>(d >> 40));
+        e.generation = static_cast<std::uint8_t>(d >> 48);
+        return true;
+    }
+
+    void write(std::size_t i, const TTEntry& e) {
+        const std::uint64_t d = pack(e);
+        table_[i].data.store(d, std::memory_order_relaxed);
+        table_[i].check.store(e.key ^ d, std::memory_order_relaxed);
+    }
+
+    std::unique_ptr<Slot[]> table_;
+    std::size_t size_ = 0;
     std::size_t mask_ = 0;
     std::uint8_t generation_ = 1;
 };

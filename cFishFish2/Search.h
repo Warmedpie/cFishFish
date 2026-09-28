@@ -359,6 +359,30 @@ inline int lmp_limit(int depth, bool improving) {
 #ifndef SR_BIG_BONUS
 #define SR_BIG_BONUS 1
 #endif
+// ---- Extensions ------------------------------------------------------------
+// A/B (vs. the engine without them, 25 ms/move unless noted):
+//   singular extension     openings -2 (600), EG suite -2 (600);
+//                          at 100 ms/move -12 (450: +133 =169 -148)          off
+//   passed-pawn extension  openings +6 (600, LOS 71%), EG suite -5 (600)    off
+// Neither is a proven gain here; kept, switched off, for retesting at longer
+// time controls or after other search changes.
+#ifndef SR_SINGULAR
+#define SR_SINGULAR 0
+#endif
+#ifndef SR_PAWN_EXT
+#define SR_PAWN_EXT 0
+#endif
+// Singular extension: at depth >= SingularMinDepth, if the TT move (a lower
+// bound or exact, from a search at most 3 plies shallower) is better than
+// every other move by SingularMargin * depth in a half-depth search, it is
+// searched one ply deeper. If even the other moves beat beta, cut off
+// ("multi-cut").
+inline constexpr bool UseSingular = SR_SINGULAR;
+inline constexpr int SingularMinDepth = 8;
+inline constexpr int SingularMargin = 2;
+// Passed-pawn extension: a pawn push to the 7th rank is searched one ply deeper.
+inline constexpr bool UsePawnExt = SR_PAWN_EXT;
+
 #ifndef SR_KEEP_HIST
 #define SR_KEEP_HIST 1
 #endif
@@ -465,6 +489,8 @@ public:
         const int lines = std::clamp(multipv, 1, static_cast<int>(root_moves_.size()));
 
         for (int depth = 1; depth < MaxPly && hooks_.start_next_iteration(depth); ++depth) {
+            root_depth_ = depth;
+            if (thread_id_ > 0 && depth > 1 && (depth + thread_id_) % 2 == 0) continue;
             excluded_.clear();
             std::vector<Line> completed;
 
@@ -496,6 +522,11 @@ public:
 
     std::uint64_t nodes() const { return nodes_; }
 
+    // Lazy SMP: helper threads (id >= 1) search the same position with a
+    // shared TT; they skip alternate depths so the threads spread out, and
+    // their results reach the main thread (id 0) only through the TT.
+    void set_thread_id(int id) { thread_id_ = id; }
+
 private:
     // Principal Variation Search.
     // First move: full window. Remaining moves: null window (alpha, alpha+1)
@@ -522,11 +553,16 @@ private:
 
         // TT probe. Cut off only in non-PV nodes so the PV stays complete.
         chess::Move tt_move(chess::Move::NO_MOVE);
+        // Singular-extension verification search: this node is being searched
+        // without the move in se_excluded_[ply]; the TT result for the node
+        // (which includes that move) must not cut it off or be overwritten.
+        const chess::Move se_excluded = se_excluded_[static_cast<std::size_t>(ply)];
+        const bool se_search = se_excluded != chess::Move::NO_MOVE;
         TTEntry entry;
         const bool tt_hit = tt_.probe(key, entry);
         if (tt_hit) {
             tt_move = chess::Move(entry.move);
-            if (!pv_node && entry.depth >= depth) {
+            if (!pv_node && !se_search && entry.depth >= depth) {
                 const Score s = score_from_tt(entry.score, ply);
                 if (entry.bound == Bound::Exact ||
                     (entry.bound == Bound::Lower && s >= beta) ||
@@ -569,7 +605,7 @@ private:
             const bool nmp_eval_ok =
                 static_eval >= beta ||
                 (UseImprovingNmp && improving && static_eval >= beta - NmpImprovingMargin);
-            if (null_ok && depth >= NmpMinDepth && nmp_eval_ok && !is_mate_score(beta) &&
+            if (null_ok && !se_search && depth >= NmpMinDepth && nmp_eval_ok && !is_mate_score(beta) &&
                 board_.hasNonPawnMaterial(board_.sideToMove())) {
                 const int r = NmpBase + depth / NmpDiv;
                 moved_[static_cast<std::size_t>(ply)] = -1;
@@ -582,7 +618,7 @@ private:
 
             // ProbCut: if a good capture beats a raised beta in a much
             // shallower search, it very likely beats beta at full depth.
-            if (UseProbCut && depth >= ProbCutMinDepth && !is_mate_score(beta)) {
+            if (UseProbCut && !se_search && depth >= ProbCutMinDepth && !is_mate_score(beta)) {
                 const Score pc_beta = beta + ProbCutMargin - (improving ? ProbCutImproving : 0);
                 // Skip if the TT already says this position is below pc_beta.
                 const bool tt_says_low = tt_hit && entry.depth >= depth - ProbCutReduction + 1 &&
@@ -618,6 +654,7 @@ private:
 
         if (list.moves.empty())
             return board_.inCheck() ? -Mate + ply : 0;  // checkmate : stalemate
+        if (se_search && list.size() == 1) return alpha;  // only the excluded move: nothing to compare
 
         score_moves(list, tt_move, ply);
 
@@ -635,7 +672,29 @@ private:
         for (int i = 0; i < list.size(); ++i) {
             const chess::Move move = list.next(i);
             if (ply == 0 && !root_move_allowed(move)) continue;
+            if (move == se_excluded) continue;
             const bool quiet = is_quiet(board_, move);
+
+            // Extensions, limited so the search can't run away (ply < 2 x root depth).
+            int extension = 0;
+            if (ply > 0 && ply < 2 * root_depth_) {
+                if (UseSingular && move == tt_move && !se_search && depth >= SingularMinDepth && tt_hit &&
+                    entry.bound != Bound::Upper && entry.depth >= depth - 3 &&
+                    !is_mate_score(score_from_tt(entry.score, ply))) {
+                    const Score s_beta = score_from_tt(entry.score, ply) - SingularMargin * depth;
+                    se_excluded_[static_cast<std::size_t>(ply)] = move;
+                    const Score s = pvs((depth - 1) / 2, ply, s_beta - 1, s_beta, false);
+                    se_excluded_[static_cast<std::size_t>(ply)] = chess::Move(chess::Move::NO_MOVE);
+                    if (stopped_) return 0;
+                    if (s < s_beta) extension = 1;       // only the TT move is good: search it deeper
+                    else if (s_beta >= beta) return s_beta;  // several moves beat beta: multi-cut
+                }
+                if (UsePawnExt && extension == 0 && board_.at(move.from()).type() == chess::PieceType::PAWN &&
+                    move.typeOf() != chess::Move::PROMOTION) {
+                    const int to_rank = move.to().index() / 8;
+                    if ((board_.sideToMove() == chess::Color::WHITE ? to_rank : 7 - to_rank) == 6) extension = 1;
+                }
+            }
 
             // Late move pruning: at shallow depth, once enough moves have been
             // searched, skip the remaining quiet moves (ordered last, rarely
@@ -651,7 +710,7 @@ private:
                 board_.unmakeMove(move);
                 continue;
             }
-            const int new_depth = depth - 1;
+            const int new_depth = depth - 1 + extension;
             Score score;
             if (moves_searched == 0) {
                 score = -pvs(new_depth, ply + 1, -beta, -alpha, true);
@@ -706,7 +765,7 @@ private:
 
         // Don't store the root while excluding MultiPV moves: that score is
         // for "best move except the ones already found", not the position.
-        if (!(ply == 0 && !excluded_.empty())) {
+        if (!(ply == 0 && !excluded_.empty()) && !se_search) {
             const Bound bound = best >= beta        ? Bound::Lower
                               : best > alpha_orig   ? Bound::Exact
                                                     : Bound::Upper;
@@ -937,6 +996,11 @@ private:
     // Static eval per ply, for the "improving" flag (NoEval when in check).
     static constexpr Score NoEval = Infinite + 1;
     std::array<Score, MaxPly + 1> eval_stack_{};
+
+    // Singular extensions: move excluded at each ply during a verification search.
+    std::array<chess::Move, MaxPly + 1> se_excluded_{};
+    int root_depth_ = 1;
+    int thread_id_ = 0;  // 0 = main thread
 
     std::array<std::array<chess::Move, MaxPly + 1>, MaxPly + 1> pv_{};
     std::array<int, MaxPly + 1> pv_len_{};
