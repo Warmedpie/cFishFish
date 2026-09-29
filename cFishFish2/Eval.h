@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <array>
+#include <vector>
 #include <bit>
 #include <cstdlib>
 #include <cstdint>
@@ -87,10 +88,10 @@ struct MobilityWeight {
     Score mg, eg;
     int base;
 };
-inline constexpr MobilityWeight KnightMobility = {10, 5, 4};
-inline constexpr MobilityWeight BishopMobility = {10, 3, 7};
-inline constexpr MobilityWeight RookMobility = {9, 3, 7};
-inline constexpr MobilityWeight QueenMobility = {5, 2, 14};
+inline constexpr MobilityWeight KnightMobility = {9, -1, 4};
+inline constexpr MobilityWeight BishopMobility = {9, 3, 7};
+inline constexpr MobilityWeight RookMobility = {3, 8, 7};
+inline constexpr MobilityWeight QueenMobility = {3, 7, 14};
 
 // ---------------------------------------------------------------------------
 // Piece-square tables, from WHITE's point of view.
@@ -123,10 +124,10 @@ inline constexpr Table PawnMG = {
        0,   0,   0,   0,   0,   0,   0,   0,   // rank 8
       -3,   3,  -1,  -5,   2,  -7,   4,  -3,   // rank 7
      -27, -11,  14,  -1,  16,   8, -11,  21,   // rank 6
-     -14, -14,  -3,  -2,   3,  -3,  -6, -16,   // rank 5
-     -25, -27,  -6,   1,   2,   1, -20, -24,   // rank 4
-     -17, -14,  -5, -15,  -5,  -3,  17, -17,   // rank 3
-     -27, -13, -10, -22, -19,  10,  16, -20,   // rank 2
+     -25, -26, -27, -20, -21, -21, -25, -27,   // rank 5
+     -36, -41, -19, -17, -15, -17, -38, -36,   // rank 4
+     -28, -25, -13, -21, -13, -11,  -4, -25,   // rank 3
+     -33, -17, -11, -17, -13,   0,   1, -31,   // rank 2
        0,   0,   0,   0,   0,   0,   0,   0,   // rank 1
 };
 
@@ -135,11 +136,11 @@ inline constexpr Table KnightMG = {
      -83, -34, -23, -11, -11, -23, -34, -83,   // rank 8
      -28, -11, -11,  15,  15,   2, -11, -28,   // rank 7
       -4,   9,  32,  11,  37,  24,  29,  -4,   // rank 6
-     -14,   5,  12,  26,  41,  39,  25,   8,   // rank 5
-      -3,  26,   7,  12,  29,  30,  20,  19,   // rank 4
-     -17, -18,  -1,  21,  10,   9,   1,  -5,   // rank 3
-     -32, -17,   1,  -4,   1,  -4, -17, -32,   // rank 2
-     -72, -21, -31, -30,   3, -31, -14, -72,   // rank 1
+     -14,  13,  12,  31,  31,  39,  20,   8,   // rank 5
+      -3,  26,  16,   6,   7,  28,  20,  17,   // rank 4
+     -19, -18, -13,   0, -12, -10, -10, -13,   // rank 3
+     -32, -17, -27, -21, -13, -22, -17, -32,   // rank 2
+     -72, -24, -31, -30,   3, -31, -23, -72,   // rank 1
 };
 
 // Bishops, opening / middlegame
@@ -147,11 +148,11 @@ inline constexpr Table BishopMG = {
      -20,   0,  -6,  -9,  -9,  -6,   0, -20,   // rank 8
       -7,  -6,   5,   0,   0,   2,  -6,  -7,   // rank 7
      -27,   2,  -5,  12,   5,   0,  -3, -16,   // rank 6
-     -14,  -3,  16,  72,  30,  22,  18, -33,   // rank 5
-      -2,  -3,  14,  -1,  31,   1,  -8,  -2,   // rank 4
-       3,  31, -21,   6,   1,  25,   1,  -2,   // rank 3
-      -6,  20,  18,  -9,   6,  18,  25,  -6,   // rank 2
-     -22,  -2,   4, -43,  23,  -9,  -2, -22,   // rank 1
+     -14,  15,  16,  72,  30,  22,  11, -33,   // rank 5
+      -2,  -3,  15,  -1,  31,  10,  -8,  -2,   // rank 4
+       8,  31, -21,   5,  -9,   8,   1,  -9,   // rank 3
+      -6,  -1,  18, -14,  -1,  18,  -9,  -6,   // rank 2
+     -22,  -2,  -6, -43,  23, -21,  -2, -22,   // rank 1
 };
 
 // Rooks, opening / middlegame
@@ -162,8 +163,8 @@ inline constexpr Table RookMG = {
      -14,   2,  -7,   3,   1,  -2, -32, -28,   // rank 5
      -22,   6, -25, -23,  10,   2, -14, -11,   // rank 4
      -36, -16, -20,  -4, -25, -20, -31, -33,   // rank 3
-     -29, -11, -20, -12, -10,   0, -13, -25,   // rank 2
-     -18, -22,  -6,  -1,  -1,   9,  -7,  -5,   // rank 1
+     -35, -11, -20, -12, -10,   0, -13, -35,   // rank 2
+     -24, -23, -12,  -9,   0,  -4, -15, -14,   // rank 1
 };
 
 // Queens, opening / middlegame
@@ -171,11 +172,11 @@ inline constexpr Table QueenMG = {
       -1,  -1,   0,  -1,  -1,   0,  -1,  -1,   // rank 8
      -26,  -7,   4,   3,   3,   4,   2,  -2,   // rank 7
        5,   4,  15,   3,   3,   2,  22,  21,   // rank 6
-      -6, -18,  15, -16,  20,  15,  11,  19,   // rank 5
-       3, -12, -11,  -7,   0,  16,   6, -37,   // rank 4
-      -3,   5, -12, -22,   3,   6,  14,  -7,   // rank 3
-      -9,  -4,  13,  18,   6,  12,  31,  -1,   // rank 2
-     -16, -34,  12,  12,   9, -25,  -2,   1,   // rank 1
+      -6, -18,  15,   3,  20,  15,  11,   3,   // rank 5
+       8, -12, -11,  -6,   0,   3,   6, -37,   // rank 4
+      -3,   6, -12,  -5,  -5,   2,  14,  -7,   // rank 3
+      -9,  -4,   4,  10,   1,  12,  31,  -1,   // rank 2
+     -16, -34, -11,   0,   9, -25,  -2,   1,   // rank 1
 };
 
 // King, opening / middlegame
@@ -186,20 +187,20 @@ inline constexpr Table KingMG = {
       63,  74,  43,  29,  29,  43,  74,  63,   // rank 5
       68,  78,  57,  40,  40,  57,  78,  68,   // rank 4
       80,  86,  29,  34,  29,  61,  83,  76,   // rank 3
-     115, 106,  92,  85,  96, 119, 165, 128,   // rank 2
-     112, 177, 174, 116, 147, 127, 177, 175,   // rank 1
+     115, 106,  92, 117,  99, 137, 170, 128,   // rank 2
+     112, 186, 174, 126, 139, 136, 186, 187,   // rank 1
 };
 
 // ---- Endgame ---------------------------------------------------------------
 // Pawns, endgame
 inline constexpr Table PawnEG = {
        0,   0,   0,   0,   0,   0,   0,   0,   // rank 8
-     -24,  -6,   3,  15, -20,  -6,   3, -30,   // rank 7
-     -11,  -8,  -8, -12, -13,   2,   8, -12,   // rank 6
-     -14, -11, -20, -22, -18, -21, -16, -20,   // rank 5
-     -17, -14, -24, -25, -18, -24, -18, -20,   // rank 4
-     -24, -23, -24, -26, -22, -20, -25, -26,   // rank 3
-     -21, -24, -20, -22, -21, -18, -20, -29,   // rank 2
+     -38, -24, -13,  15, -20,  -6,  -7, -17,   // rank 7
+      17,  21,   6,  15,  10,  22,  25,   7,   // rank 6
+       7,   9,   2,  -1,   1,   4,   6,   1,   // rank 5
+       4,   4,  -2,  -4,   1,  -3,   3,  -2,   // rank 4
+      -4,  -3,  -3,  -4,   0,   3,  -7,  -5,   // rank 3
+       0,  -6,  -2,   5,   5,   5,  -2,  -8,   // rank 2
        0,   0,   0,   0,   0,   0,   0,   0,   // rank 1
 };
 
@@ -207,36 +208,36 @@ inline constexpr Table PawnEG = {
 inline constexpr Table KnightEG = {
      -35, -31, -19,  -6,  -6, -19, -31, -35,   // rank 8
      -24, -20, -33, -11,   7, -26, -17, -24,   // rank 7
-     -18, -11, -17,   2,   2,  -6,   1, -18,   // rank 6
-      -1,  -8,   8,   9,  17,   6,   3,  -7,   // rank 5
-      -7, -14,   8,  10,  12,   5,   3,  -2,   // rank 4
-     -81, -12, -10,  -6,   2, -10,  -3, -53,   // rank 3
-     -23, -19, -13,  -3,  -9, -16, -19, -23,   // rank 2
-     -33, -61, -22,  -6, -26, -22, -32, -33,   // rank 1
+     -18, -11, -11,  -5,   2,  -6,   1, -18,   // rank 6
+      -1,  -6,  -1,   0,   7,  -3,   0,  -7,   // rank 5
+      -7, -14,   2,   2,  10,   0,   3,  -2,   // rank 4
+     -81, -12, -16, -12,  -5, -21, -19, -53,   // rank 3
+     -23, -19, -29,  -6, -17, -16, -19, -23,   // rank 2
+     -33, -57, -22,  -6, -26, -22, -38, -33,   // rank 1
 };
 
 // Bishops, endgame
 inline constexpr Table BishopEG = {
      -16, -15, -10, -11,  10, -14, -15, -16,   // rank 8
-     -21,  16,  -2,   3,  10,  -4,   6,   3,   // rank 7
-      -9,   6,  -1,   1,  -6,  -1,   1,  -6,   // rank 6
-      -6,  -3, -15, -11,   3,   0,   9,   3,   // rank 5
-      -1, -10,   6,   9,  -9,   0,  -4, -19,   // rank 4
-      -6,  -9,   8,   2,   3,  -6, -13,   3,   // rank 3
-     -13,  -5,  -2,  -7,  -7, -24,  -9, -13,   // rank 2
-       5, -18, -18, -19,   6, -19,  -8,  -8,   // rank 1
+     -21,  -7,  -5,   7,  10,  -4,   6,   3,   // rank 7
+      -9,  17,  -6,   5,   0,  10,   1,  -6,   // rank 6
+      -6,   0,   9,   1,   6,  -1,   9,   3,   // rank 5
+       9,  -6,   6,  10,   3,   6,   3, -19,   // rank 4
+      -4,  -5,  -4,   3,   6, -18, -13,   0,   // rank 3
+     -13, -15, -11,  -2,  -5, -24, -19, -13,   // rank 2
+       5, -18,  -5, -19,  -9,  -7,  -8,  -8,   // rank 1
 };
 
 // Rooks, endgame
 inline constexpr Table RookEG = {
-      -4,  -5,   3,  -6,  -6,   0,  -2,   0,   // rank 8
-     -13, -12, -16,  -9, -22,  -2,  -8, -14,   // rank 7
-     -10, -14, -12,  -5,  -6,  -8,  -6, -13,   // rank 6
-      -3, -11,  -3,  -7, -13,  -6, -11,  -7,   // rank 5
-     -16, -17, -13, -11, -14, -23,   2, -18,   // rank 4
-     -23, -38, -15, -26, -24, -31,  -6, -18,   // rank 3
-     -24, -22, -26, -33, -35, -29, -10, -31,   // rank 2
-     -27, -32, -23, -27, -29, -35, -24, -36,   // rank 1
+     -12,  -4,  -1,  -1,  -5,  -6,   0,  -1,   // rank 8
+     -15, -11, -20, -11, -24, -10, -13, -14,   // rank 7
+      -5, -15, -18,  -9, -13, -11, -12, -20,   // rank 6
+      -3, -11, -13, -19, -18, -16, -17, -10,   // rank 5
+     -11, -15, -13, -14, -22, -27, -21, -24,   // rank 4
+     -17, -38, -17, -33, -24, -31, -30, -20,   // rank 3
+     -25, -38, -30, -39, -38, -35, -42, -38,   // rank 2
+     -32, -36, -28, -34, -40, -40, -38, -39,   // rank 1
 };
 
 // Queens, endgame
@@ -244,7 +245,7 @@ inline constexpr Table QueenEG = {
      -35, -14, -15, -12, -12, -15, -18, -33,   // rank 8
       -5, -15,   4,  12,  -3,  -8,  -9, -17,   // rank 7
      -13,  -3,  -3,  -1,  27,  38,   3, -13,   // rank 6
-     -33,   0,  12,  20,  24,  17,  33,  39,   // rank 5
+     -33,   0,  12,  20, -10,  17,  33,  39,   // rank 5
      -10,  -5,  11,   7,  16,  15,  19,  -1,   // rank 4
      -14,  10, -16,  21,   7,   1, -17, -14,   // rank 3
      -19, -16, -20, -62,  -9, -39, -24, -19,   // rank 2
@@ -254,13 +255,13 @@ inline constexpr Table QueenEG = {
 // King, endgame
 inline constexpr Table KingEG = {
        4,  48,  25,  27,  27,  25,  43,   4,   // rank 8
-      38,  59,  53,  48,  63,  42,  53,  31,   // rank 7
-      56,  67,  44,  44,  52,  53,  60,  37,   // rank 6
-      47,  57,  52,  55,  52,  57,  53,  15,   // rank 5
-      40,  49,  51,  57,  55,  56,  48,  35,   // rank 4
-      11,  31,  40,  49,  51,  49,  44,  29,   // rank 3
-      23,  48,  43,  38,  42,  42,  38,  29,   // rank 2
-      27,  19,  24,  12,  20,  25,  20,   9,   // rank 1
+      38,  55,  53,  48,  87,  40,  52,  31,   // rank 7
+      50,  71,  68,  78,  74,  80,  79,  37,   // rank 6
+      47,  65,  72,  79,  76,  79,  64,  15,   // rank 5
+      40,  56,  62,  69,  68,  68,  51,  34,   // rank 4
+      11,  42,  53,  58,  60,  56,  47,  33,   // rank 3
+      49,  55,  51,  48,  48,  47,  40,  38,   // rank 2
+      27,  21,  28,  13,  23,  29,  22,   3,   // rank 1
 };
 // clang-format on
 
@@ -578,7 +579,7 @@ inline MgEg slider_mobility(const chess::Board& b, chess::Color c) {
 //   one attacker with a queen +2; one attacker if the queen hits the zone -2;
 //   safe checks +3; wide zone +18 then -2 in a second run (1200 games +8,
 //   LOS 83%; EG suite -5); all three +5; all three with the queen-zone rule -14.
-// None proven, all off. They only change *when* the SafetyTable penalty
+// None proven alone. They only change *when* the SafetyTable penalty
 // applies; its size (far smaller than Stockfish 11's king danger in the
 // attacking positions that prompted this) is the likelier problem.
 // Size tuned next: KingDangerScale plus all weights (Texel, SF labels), then
@@ -587,15 +588,105 @@ inline MgEg slider_mobility(const chess::Board& b, chess::Color c) {
 //   wide zone, scale -> 86%: +6 (LOS 71%).
 //   all three rules, scale -> 83%: +17 (LOS 92%), then -6 on new openings
 //   (1200 games about +5); EG suite -2.
-// Validation loss moved < 0.1% in every case. Not proven: scale left at 100.
+// Validation loss moved < 0.1% in every case: the training set (2/3
+// endgames) had too few king attacks to learn from.
+// So 89k king-attack positions were added: tools/datagen attack mode
+// (EV_KD_BOOST=400, attacker only), kept when Stockfish 11's phase-weighted
+// King safety for a side is <= -0.5 pawn (tools/ks_filter.py), labelled by
+// Stockfish 19. Our eval fit them badly (loss 0.057 vs 0.034). Re-tuned on
+// the 240k set + these; validation loss now -1.4 to -2%:
+//   current rules, scale 131%: +3.   wide zone, scale 71%: -5.
+//   all three rules, scale 75%: +12, +13, +22 on three opening sets
+//   (1800 games +16, LOS 99%); EG suite -5 (+-14).
+// Adopted: all three rules on (queen needed, one attacker enough), with the
+// tuned weights.
 #ifndef EV_KS_ONE_ATTACKER
-#define EV_KS_ONE_ATTACKER 0
+#define EV_KS_ONE_ATTACKER 1
 #endif
 #ifndef EV_KS_SAFE_CHECKS
-#define EV_KS_SAFE_CHECKS 0
+#define EV_KS_SAFE_CHECKS 1
 #endif
 #ifndef EV_KS_WIDE_ZONE
-#define EV_KS_WIDE_ZONE 0
+#define EV_KS_WIDE_ZONE 1
+#endif
+// King danger formula and pawn shelter / storm (see danger2 and shelter
+// below). EV_KDANGER2 replaces the SafetyTable danger (and the EV_KS_* rules
+// except the wide zone, which still sets the squares attackers are counted
+// on) with a weighted sum of king-attack signals, squared; EV_SHELTER
+// replaces the pawn shield with shelter / storm tables per file.
+// Both prompted by a term-by-term comparison with Stockfish 11's eval, where
+// king safety was 38% of the disagreement (ideas only, own implementation).
+// Tuned (all weights, the formula's own gradient in tools/tuner) on the 329k
+// Stockfish-labelled set; validation loss -2.1% (formula), -0.8% (shelter),
+// -2.8% (both). A/B vs. the previous engine, 25 ms/move, 600 games each:
+//   formula: +37, +48 on new openings (1200 games +42, LOS 100%); EG suite +6.
+//   shelter / storm: -32.   both: +8.
+// Adopted: the formula. Shelter / storm off.
+#ifndef EV_KDANGER2
+#define EV_KDANGER2 1
+#endif
+#ifndef EV_SHELTER
+#define EV_SHELTER 0
+#endif
+// Endgame scale factors (EV_SCALE2; replaces EV_SCALING) and the initiative
+// adjustment of the endgame score (EV_INITIATIVE); see scale_info() and
+// initiative_signals() below. Ideas from Stockfish 11's eval (own
+// implementation; the KPK table is solved here at startup and matched
+// Stockfish 11's on 3000 random positions). Tuned with their own gradients in
+// tools/tuner on the 329k Stockfish-labelled set; validation loss -12.8%
+// (scale), -7.6% (initiative), -14.2% (both). A/B vs. the previous engine,
+// 25 ms/move, 600 games each:
+//   scale: +22, +2, +26 on three opening sets (1800 games +17, LOS 99%);
+//     EG suite +7.
+//   initiative: -12.   both: -7 (EG suite +13).
+// Adopted: scale factors. Initiative off: the fit gain didn't carry over.
+#ifndef EV_SCALE2
+#define EV_SCALE2 1
+#endif
+#ifndef EV_INITIATIVE
+#define EV_INITIATIVE 0
+#endif
+// Stockfish 11-style extras, each its own switch (see threats2(), pieces2(),
+// imbalance2(), MobExtra and passed2() below):
+//   EV_THREATS2   threats on minors, safe pawn / pawn-push threats, knight or
+//                 slider able to hit the queen, restricted squares
+//   EV_PIECES2    minor behind a pawn, long-diagonal bishop, minor distance
+//                 to own king, trapped rook, rook on a queen's file, weak queen
+//   EV_IMBALANCE2 piece-count interaction table (own x own, own x theirs)
+//   EV_MOBILITY2  per-count mobility bonus on top of the linear weights
+//   EV_PASSED2    passed-pawn path safety and distance from the edge
+// Ideas from Stockfish 11's eval (own implementation, own starting values).
+// Each tuned alone (all weights, 329k Stockfish-labelled set) and A/B'd vs.
+// the engine without them, 600 games from normal openings, 25 ms/move:
+//   threats2 +19 (loss -1.9%), pieces2 +13 (-0.8%), mobility2 +11 (-1.3%),
+//   passed2 +21 (-0.5%), imbalance2 -16 (-2.3%).
+// The four positive ones tuned together (loss -4.3%): +70, +68 on new
+// openings (1200 games +69, LOS 100%); EG suite +27. Adopted; imbalance2 off.
+#ifndef EV_THREATS2
+#define EV_THREATS2 1
+#endif
+#ifndef EV_PIECES2
+#define EV_PIECES2 1
+#endif
+#ifndef EV_IMBALANCE2
+#define EV_IMBALANCE2 0
+#endif
+#ifndef EV_MOBILITY2
+#define EV_MOBILITY2 1
+#endif
+#ifndef EV_PASSED2
+#define EV_PASSED2 1
+#endif
+// Connected pawns and weak-pawn extras (EV_CONNECTED): see pawn_links() below.
+// Idea from Stockfish 11's pawn eval (own implementation). Tuned on the 329k
+// Stockfish-labelled set; A/B vs. the engine without it, 600 games from
+// normal openings, 25 ms/move:
+//   all weights re-tuned with it (validation loss -1.3%): -20.
+//   only its own weights tuned (-0.65%; the pawn PSTs already carry most of
+//   it, and its values came out small): -9.
+// (A control re-tune without it moved the loss by only -0.1%.) Off.
+#ifndef EV_CONNECTED
+#define EV_CONNECTED 0
 #endif
 #ifndef EV_SCALING
 #define EV_SCALING 0
@@ -612,6 +703,16 @@ inline constexpr bool EvalUseMobilityArea  = EV_MOBILITY_AREA;
 inline constexpr bool EvalUseTempo         = EV_TEMPO;
 inline constexpr bool EvalUseSpace         = EV_SPACE;
 inline constexpr bool EvalUseScaling       = EV_SCALING;
+inline constexpr bool EvalUseDanger2       = EV_KDANGER2;
+inline constexpr bool EvalUseScale2        = EV_SCALE2;
+inline constexpr bool EvalUseConnected     = EV_CONNECTED;
+inline constexpr bool EvalUseThreats2      = EV_THREATS2;
+inline constexpr bool EvalUsePieces2       = EV_PIECES2;
+inline constexpr bool EvalUseImbalance2    = EV_IMBALANCE2;
+inline constexpr bool EvalUseMobility2     = EV_MOBILITY2;
+inline constexpr bool EvalUsePassed2       = EV_PASSED2;
+inline constexpr bool EvalUseInitiative    = EV_INITIATIVE;
+inline constexpr bool EvalUseShelter       = EV_SHELTER;
 inline constexpr int  KsOneAttacker        = EV_KS_ONE_ATTACKER;
 inline constexpr bool KsSafeChecks         = EV_KS_SAFE_CHECKS;
 inline constexpr bool KsWideZone           = EV_KS_WIDE_ZONE;
@@ -627,19 +728,19 @@ inline constexpr bool EvalUseImbalance     = EV_IMBALANCE;      // knight / rook
 // Passed pawns, by relative rank (rank 2 = index 1 ... rank 7 = index 6).
 // Started from the author's earlier engine, then tuned. They overlap with the
 // pawn PSTs (both reward advanced pawns), so only their sum is meaningful.
-inline constexpr Score PassedMG[8] = {0, -27, -30, -10, -8, 64, 145, 0};
-inline constexpr Score PassedEG[8] = {0, 12, 7, 10, 29, 45, 61, 0};
-inline constexpr MgEg PassedProtected = {7, 2};   // defended by own pawn
-inline constexpr MgEg PassedBlocked = {-7, 1}; // stop square occupied
-inline constexpr Score PassedFreePathEG[8] = {0, 1, 2, 6, 11, 27, 71, 0};
+inline constexpr Score PassedMG[8] = {0, 7, -5, 11, 27, 31, 145, 0};
+inline constexpr Score PassedEG[8] = {0, 16, 9, 11, 26, 42, 79, 0};
+inline constexpr MgEg PassedProtected = {18, 9};   // defended by own pawn
+inline constexpr MgEg PassedBlocked = {-6, 1}; // stop square occupied
+inline constexpr Score PassedFreePathEG[8] = {0, -7, -3, 3, 11, 26, 77, 0};
 inline constexpr Score PassedKingDistEG = 4;           // x (rank-2) x (2*their king dist - our king dist)
-inline constexpr MgEg RookBehindPasser = {28, 9};
+inline constexpr MgEg RookBehindPasser = {-4, 25};
 
-// King safety: attack units -> penalty (mg), only with 2+ attackers.
+// King safety (EV_KDANGER2 off): attack units -> penalty (mg), when the attacker has a queen (rules: EV_KS_*).
 inline constexpr int KingAttackWeight[6] = {0, 2, 2, 3, 5, 0};  // per attacked zone square
-inline constexpr Score KingDangerScale = 100;  // % applied to SafetyTable (tuner slot)
+inline constexpr Score KingDangerScale = 75;  // % applied to SafetyTable (tuner slot)
 inline constexpr int SafeCheckUnits[6]   = {0, 3, 2, 4, 6, 0};  // N, B, R, Q safe check available
-inline constexpr Score ShieldRank3 = -9, ShieldMissing = -31, ShieldOpenFile = -22;  // mg, per file
+inline constexpr Score ShieldRank3 = -9, ShieldMissing = -22, ShieldOpenFile = -20;  // mg, per file
 // Classic attack-unit table (chessprogramming.org "King Safety").
 inline constexpr Score SafetyTable[64] = {
       0,   0,   1,   2,   3,   5,   7,   9,  12,  15,  18,  22,  26,  30,  35,  39,
@@ -649,28 +750,28 @@ inline constexpr Score SafetyTable[64] = {
 };
 
 // Pawn structure (per pawn).
-inline constexpr MgEg IsolatedPawn = {-15, -10};
-inline constexpr MgEg DoubledPawn = {-7, -12};
-inline constexpr MgEg BackwardPawn = {-11, -11};
+inline constexpr MgEg IsolatedPawn = {-12, -12};
+inline constexpr MgEg DoubledPawn = {-4, -14};
+inline constexpr MgEg BackwardPawn = {-9, -9};
 
 // Outposts (protected by own pawn, can never be attacked by an enemy pawn).
 inline constexpr MgEg KnightOutpost = {25, 15};
 inline constexpr MgEg BishopOutpost = {12, 6};
 
 // Bishops.
-inline constexpr MgEg BishopPair = {67, 41};
-inline constexpr MgEg BadBishopPerPawn = {5, 0};  // own pawns on the bishop's colour
+inline constexpr MgEg BishopPair = {46, 37};
+inline constexpr MgEg BadBishopPerPawn = {2, -3};  // own pawns on the bishop's colour
 
 // Rooks.
-inline constexpr MgEg RookOpenFile = {38, 0};
-inline constexpr MgEg RookSemiOpenFile = {20, 7};
-inline constexpr MgEg RookOnSeventh = {-9, 12};
+inline constexpr MgEg RookOpenFile = {37, 1};
+inline constexpr MgEg RookSemiOpenFile = {14, 11};
+inline constexpr MgEg RookOnSeventh = {-8, 10};
 
 // Threats (bonus for the attacking side).
-inline constexpr MgEg ThreatByPawn = {56, 29};  // pawn attacks a piece
-inline constexpr MgEg ThreatByMinor = {42, 24};  // knight/bishop attacks rook/queen
+inline constexpr MgEg ThreatByPawn = {11, 62};  // pawn attacks a piece
+inline constexpr MgEg ThreatByMinor = {46, 21};  // knight/bishop attacks rook/queen
 inline constexpr MgEg ThreatByRook = {35, 20};  // rook attacks queen
-inline constexpr MgEg HangingPiece = {13, 27};  // attacked and undefended
+inline constexpr MgEg HangingPiece = {12, 22};  // attacked and undefended
 
 // Endgame terms. Hand-set, then Texel-tuned with every older weight frozen
 // (tools/tuner ... only_new=1).
@@ -680,19 +781,79 @@ inline constexpr Score CandidateEG[8] = {0, 5, 6, 11, 16, 26, 0, 0};  // by rela
 #ifndef EV_PAWN_THREATS_MG
 #define EV_PAWN_THREATS_MG 8
 #endif
-inline constexpr MgEg ThreatOnPawn = {23, 24};        // minor / rook attacks an undefended pawn
-inline constexpr Score KingThreatOnPawnEG = 24;     // king attacks an undefended pawn
+inline constexpr MgEg ThreatOnPawn = {17, 29};        // minor / rook attacks an undefended pawn
+inline constexpr Score KingThreatOnPawnEG = 51;     // king attacks an undefended pawn
 inline constexpr MgEg RookBehindEnemyPasser = {0, 18};
 inline constexpr MgEg RookInFrontOfEnemyPasser = {0, -8};
 
 // Second-round terms (starting values; tuned on Stockfish labels).
-inline constexpr MgEg ThreatOnWeakPawn = {-1, 10};     // minor / rook attacks a pawn not defended by a pawn
-inline constexpr MgEg BadBishopFixedPawn = {-12, -12}; // per own pawn on the bishop's colour that can't advance
-inline constexpr MgEg KnightPerPawn = {10, 9};          // per knight, per own pawn above 5 (knights like closed positions)
-inline constexpr MgEg RookPerPawn = {3, 12};          // per rook, per own pawn above 5 (rooks like open ones)
+inline constexpr MgEg ThreatOnWeakPawn = {0, 8};     // minor / rook attacks a pawn not defended by a pawn
+inline constexpr MgEg BadBishopFixedPawn = {-8, -6}; // per own pawn on the bishop's colour that can't advance
+inline constexpr MgEg KnightPerPawn = {6, 4};          // per knight, per own pawn above 5 (knights like closed positions)
+inline constexpr MgEg RookPerPawn = {5, -6};          // per rook, per own pawn above 5 (rooks like open ones)
 
-inline constexpr Score Tempo = 25;       // side to move
-inline constexpr Score SpacePerSquare = 3;  // mg
+// King danger formula (EV_KDANGER2), for one king. danger = sum of
+// KdWeight[i] * signal i (signals: KdFeature below); penalty = danger^2 / 1024
+// in the middlegame and danger * KdEgSlope / 64 in the endgame, when danger > 0.
+inline constexpr int KdWeight[17] = {25, 0, 2, -3, 21, 15, 152, 78, 167, 139, 31, 6, -14, 59, -49, -201, 198};
+inline constexpr int KdEgSlope = 9;
+
+// Pawn shelter / storm (EV_SHELTER), mg, per file of the three in front of
+// the king. Index [d][r]: d = file distance from the board edge (0-3),
+// r = relative rank of our rearmost pawn there (0 = none) / the enemy's
+// frontmost pawn there (0 = none). A storm pawn directly blocked by our
+// shelter pawn uses BlockedStorm[r].
+inline constexpr Score ShelterMG[4][7] = {{-10, 35, 25, 5, 0, 0, 0}, {-10, 35, 25, 5, 0, 0, 0}, {-10, 35, 25, 5, 0, 0, 0}, {-10, 35, 25, 5, 0, 0, 0}};
+inline constexpr Score StormMG[4][8] = {{0, 0, -45, -25, -10, -4, 0, 0}, {0, 0, -45, -25, -10, -4, 0, 0}, {0, 0, -45, -25, -10, -4, 0, 0}, {0, 0, -45, -25, -10, -4, 0, 0}};
+inline constexpr Score BlockedStormMG[8] = {0, 0, -10, -5, 0, 0, 0, 0};
+inline constexpr Score KingPawnDistEG = -8;  // per square to the nearest own pawn
+
+// Initiative (EV_INITIATIVE): c = sum InitWeight[i] * signal i (InitFeature
+// below); the endgame score moves by c towards the side that is ahead, but a
+// negative c can at most bring it to 0.
+inline constexpr int InitWeight[8] = {10, 10, 20, 8, 10, 40, -40, -100};
+
+// Endgame scale factors (EV_SCALE2), out of 64, for the side that is ahead
+// (ScaleCat below says which applies):
+//   [0] + [1] * its pawns      [0] + [2] * its pawns (opposite bishops, other pieces too)
+//   [3] + [4] * passed pawns (bishops of opposite colour only)
+//   [5] + [6] * minors facing a lone queen      [7] no pawns, <= a minor ahead
+//   [8] KRKP drawish      [9] KQKP drawish (7th-rank a/c/f/h pawn)
+inline constexpr int ScaleParam[10] = {39, 6, 4, 6, 7, 57, 20, 3, 5, 4};
+
+// Connected pawns (EV_CONNECTED), by the pawn's relative rank.
+inline constexpr Score PhalanxMG[8] = {0, 2, 5, 8, 15, 30, 50, 0};    // own pawn beside it
+inline constexpr Score PhalanxEG[8] = {0, 0, 2, 5, 12, 25, 40, 0};
+inline constexpr Score SupportedMG[8] = {0, 0, 6, 5, 10, 20, 35, 0};  // defended by an own pawn
+inline constexpr Score SupportedEG[8] = {0, 0, 3, 4, 10, 20, 35, 0};
+inline constexpr MgEg SupportCount = {5, 3};        // per defending own pawn
+inline constexpr MgEg ConnectedOpposed = {-5, -5};  // connected, but an enemy pawn is ahead on its file
+inline constexpr MgEg WeakUnopposed = {-10, -15};   // isolated or backward, no enemy pawn ahead on its file
+inline constexpr MgEg WeakLever = {-5, -40};        // attacked by two enemy pawns, no own pawn defends it
+
+// EV_THREATS2, by threats2() signal: minor hits an enemy minor not defended by
+// a pawn; rook hits one; our safe pawns hit a piece; a safe pawn push would
+// hit a piece; our knight can reach a safe square hitting the queen; a
+// bishop / rook likewise (square attacked twice by us); restricted squares.
+inline constexpr MgEg Threats2W[7] = {{24, 24}, {17, 28}, {56, -19}, {22, 13}, {9, -10}, {19, -6}, {5, 0}};
+// EV_PIECES2, by pieces2() signal: minor with a pawn right in front; bishop
+// seeing two centre squares through pawns; knight / bishop distance to own
+// king (per square); trapped rook; trapped rook without castling rights (extra);
+// rook on a file with a queen; our queen pinned / exposed to a discovered attack.
+inline constexpr MgEg Pieces2W[8] = {{4, 10}, {22, 10}, {-4, -1}, {-4, -1}, {7, 13}, {-28, -27}, {7, 6}, {-19, 32}};
+// EV_IMBALANCE2: counts (0 bishop pair, 1 P, 2 N, 3 B, 4 R, 5 Q); weights for
+// own_i * own_j (j <= i, 21) then own_i * theirs_j (j < i, 15).
+inline constexpr MgEg Imbalance2W[36] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}};
+// EV_MOBILITY2: extra bonus by number of mobility-area squares: N 0-8, B 0-13,
+// R 0-14, Q 0-27 (index offsets 0, 9, 23, 38).
+inline constexpr MgEg MobExtra[66] = {{0, 0}, {16, 0}, {20, 38}, {21, 52}, {24, 55}, {25, 58}, {21, 62}, {15, 67}, {8, 67}, {18, 0}, {25, 20}, {32, 35}, {33, 50}, {33, 58}, {32, 59}, {23, 61}, {20, 61}, {13, 59}, {3, 57}, {0, 50}, {0, 51}, {0, 54}, {0, 54}, {0, 0}, {-56, 2}, {-44, 48}, {-39, 55}, {-33, 53}, {-28, 51}, {-26, 56}, {-22, 46}, {-19, 40}, {-20, 41}, {-17, 35}, {-21, 31}, {-24, 28}, {-30, 26}, {0, 19}, {0, 0}, {0, 0}, {4, 0}, {1, 0}, {3, 0}, {10, 0}, {12, 0}, {15, 0}, {14, 54}, {18, 46}, {16, 59}, {17, 65}, {17, 65}, {16, 74}, {8, 69}, {11, 77}, {5, 82}, {-2, 72}, {0, 74}, {0, 63}, {0, 75}, {0, 60}, {0, 0}, {0, 65}, {0, 0}, {0, 98}, {0, 0}, {0, 0}};
+// EV_PASSED2 (per passed pawn, relative rank index): path to promotion not
+// attacked or occupied by the enemy [0-7]; else stop square safe [8-15]; every
+// path square defended by us [16-23]; per file of distance from the edge [24].
+inline constexpr MgEg Passed2W[25] = {{0, 0}, {0, 0}, {0, 0}, {0, 12}, {0, 30}, {0, 50}, {0, 70}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {-10, 1}, {0, 5}, {0, 21}, {0, 20}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 5}, {0, 8}, {0, 55}, {0, 77}, {0, 0}, {-13, -2}};
+
+inline constexpr Score Tempo = 26;       // side to move
+inline constexpr Score SpacePerSquare = 4;  // mg
 
 // ---- Bitboard helpers (a1 = bit 0, h8 = bit 63) -----------------------------
 namespace bb {
@@ -755,16 +916,35 @@ struct AttackInfo {
     int king_attackers[2]{};  // indexed by attacking side
     bb::U64 zone[2]{};        // king zone of each side (the squares attackers are counted on)
     int king_units[2]{};
+    int zone_attackers[2][6]{};  // [attacking side][piece type]: pieces hitting the enemy king zone
+    int zone_hits[2]{};          // attacked king-zone squares, summed over the attacking pieces
+    bb::U64 twice[2]{};          // squares attacked at least twice
+    bool castle[2][2]{};         // [side][0 = king side, 1 = queen side] castling rights
     // Slider mobility (weight * attacked squares) and mobility-area correction.
     MgEg slider[2]{};
     MgEg mobility_adjust[2]{};
     int stm = 0;  // side to move (0 = white)
 };
 
+// MobExtra index for piece type t (1 N .. 4 Q) with n mobility-area squares.
+inline int mob2_index(int t, int n) {
+    constexpr int base[5] = {0, 0, 9, 23, 38}, cap[5] = {0, 8, 13, 14, 27};
+    return base[t] + std::min(n, cap[t]);
+}
+
 inline AttackInfo gather_attacks(const chess::Board& b) {
     using namespace bb;
     AttackInfo ai;
     ai.stm = b.sideToMove() == chess::Color::WHITE ? 0 : 1;
+    {
+        using CS = chess::Board::CastlingRights::Side;
+        const auto cr = b.castlingRights();
+        for (int c = 0; c < 2; ++c) {
+            const chess::Color col = c == 0 ? chess::Color::WHITE : chess::Color::BLACK;
+            ai.castle[c][0] = cr.has(col, CS::KING_SIDE);
+            ai.castle[c][1] = cr.has(col, CS::QUEEN_SIDE);
+        }
+    }
     const U64 occ = b.occ().getBits();
     for (int c = 0; c < 2; ++c) {
         const chess::Color col = c == 0 ? chess::Color::WHITE : chess::Color::BLACK;
@@ -784,6 +964,13 @@ inline AttackInfo gather_attacks(const chess::Board& b) {
         const U64 excluded = ai.pieces[c][0] | pawn_attacks(ai.pieces[c ^ 1][0], !white);  // mobility area
         ai.by[c][0] = pawn_attacks(ai.pieces[c][0], white);
         ai.by[c][5] = chess::attacks::king(chess::Square(lsb(ai.pieces[c][5]))).getBits();
+        {
+            const U64 p = ai.pieces[c][0];
+            const U64 left = white ? ((p << 7) & ~FileH) : ((p >> 9) & ~FileH);
+            const U64 right = white ? ((p << 9) & ~FileA) : ((p >> 7) & ~FileA);
+            ai.twice[c] = (left & right) | (ai.by[c][0] & ai.by[c][5]);
+        }
+        U64 seen = ai.by[c][0] | ai.by[c][5];
         const MobilityWeight* mw[5] = {nullptr, &KnightMobility, &BishopMobility, &RookMobility, &QueenMobility};
         for (int t = 1; t <= 4; ++t) {
             U64 pcs = ai.pieces[c][t];
@@ -799,18 +986,27 @@ inline AttackInfo gather_attacks(const chess::Board& b) {
                     case 4: a = chess::attacks::queen(s, chess::Bitboard(occ)).getBits(); break;
                 }
                 ai.by[c][t] |= a;
+                ai.twice[c] |= seen & a;
+                seen |= a;
                 if (t >= 2) {
                     ai.slider[c].mg += mw[t]->mg * popcount(a);
                     ai.slider[c].eg += mw[t]->eg * popcount(a);
                 }
                 if (const U64 hit = a & zone[c ^ 1]) {
                     ++ai.king_attackers[c];
+                    ++ai.zone_attackers[c][t];
+                    ai.zone_hits[c] += popcount(hit);
                     ai.king_units[c] += KingAttackWeight[t] * popcount(hit);
                 }
                 if (EvalUseMobilityArea) {
                     const int n = popcount(a & excluded);
                     ai.mobility_adjust[c].mg -= mw[t]->mg * n;
                     ai.mobility_adjust[c].eg -= mw[t]->eg * n;
+                }
+                if (EvalUseMobility2) {
+                    const MgEg& e = MobExtra[mob2_index(t, popcount(a & ~excluded))];
+                    ai.mobility_adjust[c].mg += e.mg;
+                    ai.mobility_adjust[c].eg += e.eg;
                 }
             }
         }
@@ -851,6 +1047,41 @@ inline bb::U64 passed_pawns(const AttackInfo& ai, int c) {
     return res;
 }
 
+// Connected-pawn signals for side c's pawn on sq (EV_CONNECTED): calls
+// f(kind, index, count): kind 0 = phalanx at rank index, 1 = supported at
+// rank index, 2 = number of own defenders, 3 = connected but opposed,
+// 4 = weak (isolated / backward) and unopposed, 5 = lever-attacked twice and
+// undefended.
+template <typename F>
+inline void pawn_links(const AttackInfo& ai, int c, int sq, F&& f) {
+    using namespace bb;
+    const bool white = (c == 0);
+    const int them = c ^ 1;
+    const U64 ours = ai.pieces[c][0], theirs = ai.pieces[them][0];
+    const int file = sq % 8, r = rel_rank(sq, white);
+    const U64 bit = 1ULL << sq;
+    const U64 rank = rank_mask(sq / 8);
+    const bool phalanx = (adjacent_files(file) & rank & ours) != 0;
+    const U64 defenders = pawn_attacks(bit, !white) & ours;  // own pawns that defend sq
+    const bool opposed = (M.forward_file[c][sq] & theirs) != 0;
+    if (phalanx) f(0, r, 1);
+    if (defenders) {
+        f(1, r, 1);
+        f(2, 0, popcount(defenders));
+    }
+    if ((phalanx || defenders) && opposed) f(3, 0, 1);
+    const bool isolated = (adjacent_files(file) & ours) == 0;
+    bool backward = false;
+    if (!isolated) {
+        const int stop = white ? sq + 8 : sq - 8;
+        backward = (adjacent_files(file) & ~ranks_ahead(sq / 8, white) & ours) == 0 && stop >= 0 && stop < 64 &&
+                   (ai.by[them][0] & (1ULL << stop));
+    }
+    if ((isolated || backward) && !opposed) f(4, 0, 1);
+    const U64 attackers = pawn_attacks(bit, white) & theirs;  // enemy pawns attacking sq
+    if (popcount(attackers) == 2 && !defenders) f(5, 0, 1);
+}
+
 // King danger for side c's king, unscaled (SafetyTable value, >= 0): attack
 // units from enemy pieces hitting the king zone plus safe checks. Only when
 // the attacker has a queen, and (by default) 2+ attacking pieces; EV_KS_*
@@ -883,7 +1114,332 @@ inline Score danger_unscaled(const AttackInfo& ai, int c) {
 }
 
 // The middlegame king-danger penalty actually applied.
-inline Score danger_penalty(const AttackInfo& ai, int c) { return danger_unscaled(ai, c) * KingDangerScale / 100; }
+// Data generation "attack mode" (tools/datagen, EV_KD_BOOST = percent,
+// default 100 = off and compiled out): the danger to king kd_boost_victim is
+// multiplied, so a search using it overrates attacks on that king. datagen
+// gives it only to the attacking side's searches, steering games into
+// king-attack positions, which the normal training data lacks.
+#ifndef EV_KD_BOOST
+#define EV_KD_BOOST 100
+#endif
+#if EV_KD_BOOST != 100
+inline int kd_boost_victim = -1;  // colour whose king danger is boosted, -1 = none
+#endif
+inline Score danger_penalty(const AttackInfo& ai, int c) {
+    const Score d = danger_unscaled(ai, c) * KingDangerScale / 100;
+#if EV_KD_BOOST != 100
+    if (c == kd_boost_victim) return d * EV_KD_BOOST / 100;
+#endif
+    return d;
+}
+
+// ---- King danger formula (EV_KDANGER2) --------------------------------------
+// Signals for the danger to side c's king, weighted by KdWeight.
+enum KdFeature {
+    KdKnights, KdBishops, KdRooks, KdQueens,  // enemy pieces of that type hitting the king zone
+    KdZoneHits,        // attacked king-zone squares, summed over those pieces
+    KdWeakRing,        // squares next to the king the enemy attacks that we defend at most once, by K or Q only
+    KdSafeKnightCheck, KdSafeBishopCheck, KdSafeRookCheck, KdSafeQueenCheck,  // 0/1 each
+    KdUnsafeChecks,    // piece types with a check available, but only on unsafe squares
+    KdFlankAttacks,    // enemy attacks on our camp (own 5 ranks) on the king's flank, double attacks twice
+    KdFlankDefense,    // our attacks on the same squares
+    KdPinned,          // our pieces pinned to the king
+    KdKnightDefender,  // one of our knights guards a square next to the king (0/1)
+    KdNoQueen,         // the enemy has no queen (0/1)
+    KdBias,            // always 1
+    KdCount
+};
+static_assert(KdCount == 17);
+
+struct KdSignals {
+    int x[KdCount]{};
+};
+
+// Squares strictly between two aligned squares (empty if not aligned).
+struct BetweenTable {
+    bb::U64 t[64][64]{};
+    BetweenTable() {
+        for (int a = 0; a < 64; ++a)
+            for (int b = 0; b < 64; ++b) {
+                if (a == b) continue;
+                const bb::U64 ab = 1ULL << a, bbit = 1ULL << b;
+                const chess::Square sa(a), sb(b);
+                const int df = b % 8 - a % 8, dr = b / 8 - a / 8;
+                if (df == 0 || dr == 0)
+                    t[a][b] = chess::attacks::rook(sa, chess::Bitboard(bbit)).getBits() &
+                              chess::attacks::rook(sb, chess::Bitboard(ab)).getBits();
+                else if (df == dr || df == -dr)
+                    t[a][b] = chess::attacks::bishop(sa, chess::Bitboard(bbit)).getBits() &
+                              chess::attacks::bishop(sb, chess::Bitboard(ab)).getBits();
+            }
+    }
+};
+inline const BetweenTable& between_table() {
+    static const BetweenTable table;
+    return table;
+}
+
+inline KdSignals danger2_signals(const AttackInfo& ai, int c) {
+    using namespace bb;
+    KdSignals k;
+    const int them = c ^ 1;
+    const bool white = (c == 0);
+    const int ksq = lsb(ai.pieces[c][5]);
+    const chess::Square ks(ksq);
+    const U64 occ = ai.occ[0] | ai.occ[1];
+    const U64 ring = ai.by[c][5];
+
+    for (int t = 1; t <= 4; ++t) k.x[KdKnights + t - 1] = ai.zone_attackers[them][t];
+    k.x[KdZoneHits] = ai.zone_hits[them];
+
+    // Weak: attacked by them, not defended twice, and undefended or defended only by our king / queen.
+    const U64 weak = ai.all[them] & ~ai.twice[c] & (~ai.all[c] | ai.by[c][4] | ai.by[c][5]);
+    k.x[KdWeakRing] = popcount(weak & ring);
+
+    // Checks: safe = not occupied by them, and not defended by us (or weak and attacked twice by them).
+    const U64 safe = ~ai.occ[them] & (~ai.all[c] | (weak & ai.twice[them]));
+    const U64 nchk = chess::attacks::knight(ks).getBits() & ai.by[them][1];
+    const U64 bline = chess::attacks::bishop(ks, chess::Bitboard(occ)).getBits();
+    const U64 rline = chess::attacks::rook(ks, chess::Bitboard(occ)).getBits();
+    const U64 bchk = bline & ai.by[them][2], rchk = rline & ai.by[them][3];
+    const U64 qchk = (bline | rline) & ai.by[them][4] & ~ai.by[c][4];
+    const U64 chk[4] = {nchk, bchk, rchk, qchk};
+    for (int i = 0; i < 4; ++i) {
+        const U64 cands = chk[i] & ~ai.occ[them];
+        if (cands & safe) k.x[KdSafeKnightCheck + i] = 1;
+        else if (cands) ++k.x[KdUnsafeChecks];
+    }
+
+    // Flank: files a-d, c-f or e-h by the king's file; camp = our first five ranks.
+    const int kf = ksq % 8;
+    const U64 flank = kf <= 2 ? (file_mask(0) | file_mask(1) | file_mask(2) | file_mask(3))
+                    : kf <= 4 ? (file_mask(2) | file_mask(3) | file_mask(4) | file_mask(5))
+                              : (file_mask(4) | file_mask(5) | file_mask(6) | file_mask(7));
+    const U64 camp = white ? (rank_mask(0) | rank_mask(1) | rank_mask(2) | rank_mask(3) | rank_mask(4))
+                           : (rank_mask(7) | rank_mask(6) | rank_mask(5) | rank_mask(4) | rank_mask(3));
+    const U64 zone = flank & camp;
+    k.x[KdFlankAttacks] = popcount(ai.all[them] & zone) + popcount(ai.twice[them] & zone);
+    k.x[KdFlankDefense] = popcount(ai.all[c] & zone);
+
+    // Pins: enemy sliders lined up with our king with exactly one piece, ours, in between.
+    U64 snipers = (chess::attacks::bishop(ks, chess::Bitboard(0)).getBits() & (ai.pieces[them][2] | ai.pieces[them][4])) |
+                  (chess::attacks::rook(ks, chess::Bitboard(0)).getBits() & (ai.pieces[them][3] | ai.pieces[them][4]));
+    while (snipers) {
+        const int s = lsb(snipers);
+        snipers &= snipers - 1;
+        const U64 between = between_table().t[ksq][s] & occ;
+        if (between && (between & (between - 1)) == 0 && (between & ai.occ[c])) ++k.x[KdPinned];
+    }
+
+    k.x[KdKnightDefender] = (ai.by[c][1] & ring) ? 1 : 0;
+    k.x[KdNoQueen] = ai.pieces[them][4] ? 0 : 1;
+    k.x[KdBias] = 1;
+    return k;
+}
+
+inline int danger2_value(const KdSignals& k) {
+    int d = 0;
+    for (int i = 0; i < KdCount; ++i) d += KdWeight[i] * k.x[i];
+    return d;
+}
+
+// Penalty for side c's king (positive = bad for c).
+inline MgEg danger2_penalty(const AttackInfo& ai, int c) {
+    const int d = danger2_value(danger2_signals(ai, c));
+    if (d <= 0) return {0, 0};
+    return {d * d / 1024, d * KdEgSlope / 64};
+}
+
+// ---- Pawn shelter / storm (EV_SHELTER) --------------------------------------
+// Table entries used for a king of side c standing on ksq: calls
+// f(kind, index) for each of the three files (kind 0 = ShelterMG[d][r] with
+// index d * 7 + r, 1 = StormMG[d][r] with index d * 8 + r, 2 = BlockedStormMG[r]).
+template <typename F>
+inline void shelter_entries(const AttackInfo& ai, int c, int ksq, F&& f) {
+    using namespace bb;
+    const bool white = (c == 0);
+    const int them = c ^ 1;
+    const int kr = rel_rank(ksq, white);
+    const U64 notbehind = white ? ~0ULL << (8 * kr) : ~0ULL >> (8 * kr);  // level with or in front of the king
+    const int center = std::clamp(ksq % 8, 1, 6);
+    for (int file = center - 1; file <= center + 1; ++file) {
+        const U64 m = file_mask(file) & notbehind;
+        const U64 ours = ai.pieces[c][0] & m, theirs = ai.pieces[them][0] & m;
+        // Our rearmost pawn / their frontmost one (the one nearest our back rank).
+        const int our_r = ours ? rel_rank(white ? lsb(ours) : 63 - std::countl_zero(ours), white) : 0;
+        const int their_r = theirs ? rel_rank(white ? lsb(theirs) : 63 - std::countl_zero(theirs), white) : 0;
+        const int d = std::min(file, 7 - file);
+        f(0, d * 7 + std::min(our_r, 6));
+        if (our_r && our_r == their_r - 1) f(2, their_r);
+        else f(1, d * 8 + their_r);
+    }
+}
+
+inline Score shelter_at(const AttackInfo& ai, int c, int ksq) {
+    Score s = 0;
+    shelter_entries(ai, c, ksq, [&](int kind, int i) {
+        s += kind == 0 ? ShelterMG[i / 7][i % 7] : kind == 1 ? StormMG[i / 8][i % 8] : BlockedStormMG[i];
+    });
+    return s;
+}
+
+// The square the shelter is scored from: the king's square, or the square it
+// can still castle to, whichever gives the better shelter.
+inline int shelter_square(const AttackInfo& ai, int c) {
+    const int ksq = bb::lsb(ai.pieces[c][5]);
+    int best = ksq;
+    Score best_s = shelter_at(ai, c, ksq);
+    const int back = c == 0 ? 0 : 56;
+    for (int side = 0; side < 2; ++side)
+        if (ai.castle[c][side]) {
+            const int sq = back + (side == 0 ? 6 : 2);
+            const Score v = shelter_at(ai, c, sq);
+            if (v > best_s) { best_s = v; best = sq; }
+        }
+    return best;
+}
+
+// Distance from side c's king to its nearest pawn (0 without pawns).
+struct DistRings {
+    bb::U64 ring[64][8]{};  // squares at exactly distance d
+    constexpr DistRings() {
+        for (int a = 0; a < 64; ++a)
+            for (int b = 0; b < 64; ++b) {
+                const int df = a % 8 - b % 8, dr = a / 8 - b / 8;
+                const int d = std::max(df < 0 ? -df : df, dr < 0 ? -dr : dr);
+                ring[a][d] |= 1ULL << b;
+            }
+    }
+};
+inline constexpr DistRings Rings{};
+
+inline int king_pawn_distance(const AttackInfo& ai, int c) {
+    const bb::U64 pawns = ai.pieces[c][0];
+    if (!pawns) return 0;
+    const int ksq = bb::lsb(ai.pieces[c][5]);
+    for (int d = 1; d < 8; ++d)
+        if (pawns & Rings.ring[ksq][d]) return d;
+    return 0;
+}
+
+// ---- EV_THREATS2 / EV_PIECES2 / EV_IMBALANCE2 / EV_PASSED2 signals ----------
+// Each calls f(index, count) for side c (its own point of view).
+template <typename F>
+inline void threats2(const AttackInfo& ai, int c, F&& f) {
+    using namespace bb;
+    const bool white = (c == 0);
+    const int them = c ^ 1;
+    const U64 occ = ai.occ[0] | ai.occ[1];
+    const U64 minors_them = ai.pieces[them][1] | ai.pieces[them][2];
+    const U64 pieces_them = minors_them | ai.pieces[them][3] | ai.pieces[them][4];
+    const U64 no_pawn_guard = ~ai.by[them][0];
+    f(0, popcount((ai.by[c][1] | ai.by[c][2]) & minors_them & no_pawn_guard));
+    f(1, popcount(ai.by[c][3] & minors_them & no_pawn_guard));
+    const U64 safe = ~ai.all[them] | ai.all[c];
+    f(2, popcount(pawn_attacks(ai.pieces[c][0] & safe, white) & pieces_them));
+    // Pawn pushes (single, and double from the start rank) to safe empty squares.
+    const U64 rank3 = white ? rank_mask(2) : rank_mask(5);
+    U64 push = (white ? ai.pieces[c][0] << 8 : ai.pieces[c][0] >> 8) & ~occ;
+    push |= (white ? (push & rank3) << 8 : (push & rank3) >> 8) & ~occ;
+    push &= ~ai.by[them][0] & safe;
+    f(3, popcount(pawn_attacks(push, white) & pieces_them));
+    // Hitting the queen next move (one enemy queen).
+    const U64 strongly = ai.by[them][0] | (ai.twice[them] & ~ai.twice[c]);
+    if (popcount(ai.pieces[them][4]) == 1) {
+        const chess::Square q(lsb(ai.pieces[them][4]));
+        const U64 target = ~ai.occ[c] & ~strongly;
+        f(4, popcount(chess::attacks::knight(q).getBits() & ai.by[c][1] & target));
+        const U64 sl = (chess::attacks::bishop(q, chess::Bitboard(occ)).getBits() & ai.by[c][2]) |
+                       (chess::attacks::rook(q, chess::Bitboard(occ)).getBits() & ai.by[c][3]);
+        f(5, popcount(sl & target & ai.twice[c]));
+    }
+    // Restricted: squares both sides attack that the enemy doesn't hold strongly.
+    f(6, popcount(ai.all[them] & ai.all[c] & ~strongly));
+}
+
+template <typename F>
+inline void pieces2(const AttackInfo& ai, int c, F&& f) {
+    using namespace bb;
+    const bool white = (c == 0);
+    const int them = c ^ 1;
+    const U64 occ = ai.occ[0] | ai.occ[1];
+    const U64 pawns = ai.pieces[0][0] | ai.pieces[1][0];
+    const int ksq = lsb(ai.pieces[c][5]);
+    const U64 center = (1ULL << 27) | (1ULL << 28) | (1ULL << 35) | (1ULL << 36);  // d4 e4 d5 e5
+    for (int t = 1; t <= 2; ++t)
+        for (U64 p = ai.pieces[c][t]; p; p &= p - 1) {
+            const int sq = lsb(p);
+            const int front = white ? sq + 8 : sq - 8;
+            if (front >= 0 && front < 64 && (pawns & (1ULL << front))) f(0, 1);
+            f(t == 1 ? 2 : 3, distance(sq, ksq));
+            if (t == 2 && popcount(chess::attacks::bishop(chess::Square(sq), chess::Bitboard(pawns)).getBits() & center) >= 2)
+                f(1, 1);
+        }
+    const U64 queens = ai.pieces[0][4] | ai.pieces[1][4];
+    const U64 excluded = ai.pieces[c][0] | pawn_attacks(ai.pieces[them][0], !white);
+    for (U64 p = ai.pieces[c][3]; p; p &= p - 1) {
+        const int sq = lsb(p);
+        if (file_mask(sq % 8) & queens) f(6, 1);
+        const int mob = popcount(chess::attacks::rook(chess::Square(sq), chess::Bitboard(occ)).getBits() & ~excluded);
+        const int kf = ksq % 8, rf = sq % 8;
+        if (mob <= 3 && rel_rank(ksq, white) == 0 && rel_rank(sq, white) == 0 && ((kf < 4) == (rf < kf))) {
+            f(4, 1);
+            if (!ai.castle[c][0] && !ai.castle[c][1]) f(5, 1);
+        }
+    }
+    // Weak queen: an enemy bishop / rook lined up with it with one piece between.
+    for (U64 q = ai.pieces[c][4]; q; q &= q - 1) {
+        const int qsq = lsb(q);
+        const chess::Square qs(qsq);
+        U64 snipers = (chess::attacks::bishop(qs, chess::Bitboard(0)).getBits() & ai.pieces[them][2]) |
+                      (chess::attacks::rook(qs, chess::Bitboard(0)).getBits() & ai.pieces[them][3]);
+        int weak = 0;
+        for (; snipers; snipers &= snipers - 1) {
+            const U64 between = between_table().t[qsq][lsb(snipers)] & occ;
+            if (between && (between & (between - 1)) == 0) weak = 1;
+        }
+        if (weak) f(7, 1);
+    }
+}
+
+inline void imbalance2_counts(const AttackInfo& ai, int c, int cnt[6]) {
+    using namespace bb;
+    const U64 b = ai.pieces[c][2];
+    cnt[0] = ((b & DarkSquares) && (b & ~DarkSquares)) ? 1 : 0;
+    for (int t = 0; t <= 4; ++t) cnt[t + 1] = popcount(ai.pieces[c][t]);
+}
+template <typename F>
+inline void imbalance2(const AttackInfo& ai, int c, F&& f) {
+    int ours[6], theirs[6];
+    imbalance2_counts(ai, c, ours);
+    imbalance2_counts(ai, c ^ 1, theirs);
+    int k = 0;
+    for (int i = 0; i < 6; ++i)
+        for (int j = 0; j <= i; ++j, ++k)
+            if (ours[i] && ours[j]) f(k, ours[i] * ours[j]);
+    for (int i = 1; i < 6; ++i)
+        for (int j = 0; j < i; ++j, ++k)
+            if (ours[i] && theirs[j]) f(k, ours[i] * theirs[j]);
+}
+
+template <typename F>
+inline void passed2(const AttackInfo& ai, int c, F&& f) {
+    using namespace bb;
+    const bool white = (c == 0);
+    const int them = c ^ 1;
+    for (U64 p = passed_pawns(ai, c); p; p &= p - 1) {
+        const int sq = lsb(p);
+        const int r = rel_rank(sq, white), file = sq % 8;
+        f(24, std::min(file, 7 - file));
+        if (r < 3) continue;
+        const U64 path = M.forward_file[c][sq];
+        const U64 unsafe = path & (ai.all[them] | ai.occ[them]);
+        const int stop = white ? sq + 8 : sq - 8;
+        if (!unsafe) f(r, 1);
+        else if (!(unsafe & (1ULL << stop))) f(8 + r, 1);
+        if ((path & ~ai.all[c]) == 0) f(16 + r, 1);
+    }
+}
 
 inline TermScores side_positional(const AttackInfo& ai, int c) {
     using namespace bb;
@@ -920,6 +1476,17 @@ inline TermScores side_positional(const AttackInfo& ai, int c) {
                     (ai.by[them][0] & (1ULL << stop)))
                     add(TermStructure, BackwardPawn);
             }
+            if (EvalUseConnected)
+                pawn_links(ai, c, sq, [&](int kind, int i, int n) {
+                    switch (kind) {
+                        case 0: ts.t[TermStructure].mg += PhalanxMG[i]; ts.t[TermStructure].eg += PhalanxEG[i]; break;
+                        case 1: ts.t[TermStructure].mg += SupportedMG[i]; ts.t[TermStructure].eg += SupportedEG[i]; break;
+                        case 2: add(TermStructure, SupportCount, n); break;
+                        case 3: add(TermStructure, ConnectedOpposed); break;
+                        case 4: add(TermStructure, WeakUnopposed); break;
+                        default: add(TermStructure, WeakLever); break;
+                    }
+                });
         }
 
         if (EvalUsePassed && (M.passed[c][sq] & theirs_p) == 0 && (M.forward_file[c][sq] & ours_p) == 0) {
@@ -1054,12 +1621,26 @@ inline TermScores side_positional(const AttackInfo& ai, int c) {
         add(TermRooks, RookPerPawn, popcount(ai.pieces[c][3]) * extra);
     }
 
-    // King safety of OUR king (penalty; mg only).
-    if (EvalUseKingSafety) {
-        ts.t[TermKingSafety].mg -= danger_penalty(ai, c);
+    if (EvalUseThreats2) threats2(ai, c, [&](int i, int n) { add(TermThreats, Threats2W[i], n); });
+    if (EvalUsePieces2) pieces2(ai, c, [&](int i, int n) { add(TermOutposts, Pieces2W[i], n); });
+    if (EvalUseImbalance2) imbalance2(ai, c, [&](int i, int n) { add(TermBishops, Imbalance2W[i], n); });
+    if (EvalUsePassed2) passed2(ai, c, [&](int i, int n) { add(TermPassed, Passed2W[i], n); });
 
-        // Pawn shield, for a king on its first two ranks.
-        if (rel_rank(our_k, white) <= 1) {
+    // King safety of OUR king.
+    if (EvalUseKingSafety) {
+        if (EvalUseDanger2) {
+            const MgEg d = danger2_penalty(ai, c);
+            ts.t[TermKingSafety].mg -= d.mg;
+            ts.t[TermKingSafety].eg -= d.eg;
+        } else {
+            ts.t[TermKingSafety].mg -= danger_penalty(ai, c);
+        }
+
+        if (EvalUseShelter) {
+            ts.t[TermKingSafety].mg += shelter_at(ai, c, shelter_square(ai, c));
+            ts.t[TermKingSafety].eg += KingPawnDistEG * king_pawn_distance(ai, c);
+        } else if (rel_rank(our_k, white) <= 1) {
+            // Pawn shield, for a king on its first two ranks.
             const int kf = std::clamp(our_k % 8, 1, 6);
             for (int f = kf - 1; f <= kf + 1; ++f) {
                 const U64 file = file_mask(f);
@@ -1093,6 +1674,120 @@ inline TermScores side_positional(const AttackInfo& ai, int c) {
     return ts;
 }
 
+// ---- KPK table ---------------------------------------------------------------
+// King + pawn vs king, solved once by retrograde analysis. Positions are
+// stored with the pawn side as White and the pawn on files a-d (others are
+// mirrored). kpk_win(): true = White (the pawn side) wins with best play.
+class Kpk {
+public:
+    static const Kpk& get() {
+        static const Kpk table;
+        return table;
+    }
+    // Squares 0..63 with a1 = 0; pawn side White; stm 0 = White to move.
+    bool win(int stm, int wk, int bk, int wp) const {
+        if (wp % 8 > 3) { wk ^= 7; bk ^= 7; wp ^= 7; }  // mirror files
+        return res_[index(stm, wk, bk, wp)] == Win;
+    }
+
+private:
+    enum : std::uint8_t { Unknown = 0, Invalid, Draw, Win };
+    std::vector<std::uint8_t> res_ = std::vector<std::uint8_t>(2 * 64 * 64 * 24, Unknown);
+
+    static int index(int stm, int wk, int bk, int wp) {
+        const int p = (wp / 8 - 1) * 4 + (wp % 8);  // rank 2..7, file a..d
+        return ((stm * 64 + wk) * 64 + bk) * 24 + p;
+    }
+    static int dist(int a, int b) { return std::max(std::abs(a % 8 - b % 8), std::abs(a / 8 - b / 8)); }
+    static bool pawn_attacks_sq(int wp, int sq) {
+        return sq / 8 == wp / 8 + 1 && std::abs(sq % 8 - wp % 8) == 1;
+    }
+
+    Kpk() {
+        // Initial classification.
+        for (int stm = 0; stm < 2; ++stm)
+            for (int wk = 0; wk < 64; ++wk)
+                for (int bk = 0; bk < 64; ++bk)
+                    for (int r = 1; r <= 6; ++r)
+                        for (int f = 0; f < 4; ++f) {
+                            const int wp = r * 8 + f;
+                            std::uint8_t& v = res_[index(stm, wk, bk, wp)];
+                            if (wk == bk || wk == wp || bk == wp || dist(wk, bk) <= 1 ||
+                                (stm == 0 && pawn_attacks_sq(wp, bk)))
+                                v = Invalid;  // overlapping, kings touching, or the side not to move in check
+                            else if (stm == 0 && r == 6 && wk != wp + 8 && bk != wp + 8 &&
+                                     (dist(bk, wp + 8) > 1 || dist(wk, wp + 8) == 1))
+                                v = Win;  // promotes safely
+                            else if (stm == 1 && ((dist(bk, wp) == 1 && dist(wk, wp) > 1) || black_stalemated(wk, bk, wp)))
+                                v = Draw;  // pawn falls, or stalemate
+                        }
+        // Iterate until nothing changes.
+        for (bool changed = true; changed;) {
+            changed = false;
+            for (int stm = 0; stm < 2; ++stm)
+                for (int wk = 0; wk < 64; ++wk)
+                    for (int bk = 0; bk < 64; ++bk)
+                        for (int r = 1; r <= 6; ++r)
+                            for (int f = 0; f < 4; ++f) {
+                                const int wp = r * 8 + f;
+                                std::uint8_t& v = res_[index(stm, wk, bk, wp)];
+                                if (v != Unknown) continue;
+                                const std::uint8_t nv = stm == 0 ? white_moves(wk, bk, wp) : black_moves(wk, bk, wp);
+                                if (nv != Unknown) { v = nv; changed = true; }
+                            }
+        }
+        for (auto& v : res_)
+            if (v == Unknown) v = Draw;
+    }
+
+    bool black_stalemated(int wk, int bk, int wp) const {
+        for (int d = 0; d < 64; ++d) {
+            if (dist(bk, d) != 1) continue;
+            if (dist(wk, d) <= 1 || pawn_attacks_sq(wp, d)) continue;
+            return false;
+        }
+        return !pawn_attacks_sq(wp, bk);
+    }
+    std::uint8_t lookup(int stm, int wk, int bk, int wp) const { return res_[index(stm, wk, bk, wp)]; }
+
+    // White to move: a win if some move reaches a win; a draw once every move is a draw.
+    std::uint8_t white_moves(int wk, int bk, int wp) const {
+        bool all_draw = true;
+        for (int d = 0; d < 64; ++d) {
+            if (dist(wk, d) != 1 || d == wp || dist(d, bk) <= 1) continue;
+            const std::uint8_t v = lookup(1, d, bk, wp);
+            if (v == Win) return Win;
+            if (v != Draw && v != Invalid) all_draw = false;
+        }
+        const int up = wp + 8;
+        if (wp / 8 < 6 && up != wk && up != bk) {
+            const std::uint8_t v = lookup(1, wk, bk, up);
+            if (v == Win) return Win;
+            if (v != Draw && v != Invalid) all_draw = false;
+            if (wp / 8 == 1 && up + 8 != wk && up + 8 != bk) {
+                const std::uint8_t v2 = lookup(1, wk, bk, up + 8);
+                if (v2 == Win) return Win;
+                if (v2 != Draw && v2 != Invalid) all_draw = false;
+            }
+        }
+        return all_draw ? Draw : Unknown;
+    }
+    // Black to move: a draw if some move reaches a draw (or takes the pawn safely); a win once every move loses.
+    std::uint8_t black_moves(int wk, int bk, int wp) const {
+        bool all_win = true, any = false;
+        for (int d = 0; d < 64; ++d) {
+            if (dist(bk, d) != 1 || dist(d, wk) <= 1 || pawn_attacks_sq(wp, d)) continue;
+            if (d == wp) return Draw;  // undefended pawn taken (defended case excluded by dist to wk)
+            any = true;
+            const std::uint8_t v = lookup(0, wk, d, wp);
+            if (v == Draw) return Draw;
+            if (v != Win) all_win = false;
+        }
+        if (!any) return Draw;  // stalemate
+        return all_win ? Win : Unknown;
+    }
+};
+
 // Endgame scale factor (64 = normal) applied to the endgame score of the
 // side that is ahead: opposite-coloured bishops, and material that can't win.
 inline int endgame_scale(const AttackInfo& ai, Score eg_white_view) {
@@ -1115,6 +1810,148 @@ inline int endgame_scale(const AttackInfo& ai, Score eg_white_view) {
         return only_bishops ? 32 : 48;
     }
     return 64;
+}
+
+// ---- Initiative (EV_INITIATIVE) ----------------------------------------------
+enum InitFeature {
+    InPawns,             // pawns on the board
+    InPassed,            // passed pawns, both sides
+    InBothFlanks,        // pawns on both wings (files a-d and e-h) (0/1)
+    InOutflanking,       // file distance between the kings - rank distance
+    InInfiltration,      // a king on the opponent's half (0/1)
+    InPawnsOnly,         // no pieces left, pawns only (0/1)
+    InAlmostUnwinnable,  // pawns on one wing and the kings not outflanking (0/1)
+    InBias,              // always 1
+    InCount
+};
+static_assert(InCount == 8);
+struct InitSignals {
+    int x[InCount]{};
+};
+
+inline InitSignals initiative_signals(const AttackInfo& ai) {
+    using namespace bb;
+    InitSignals k;
+    const U64 pawns = ai.pieces[0][0] | ai.pieces[1][0];
+    const int wk = lsb(ai.pieces[0][5]), bk = lsb(ai.pieces[1][5]);
+    const U64 queenside = file_mask(0) | file_mask(1) | file_mask(2) | file_mask(3);
+    k.x[InPawns] = popcount(pawns);
+    k.x[InPassed] = popcount(passed_pawns(ai, 0)) + popcount(passed_pawns(ai, 1));
+    k.x[InBothFlanks] = (pawns & queenside) && (pawns & ~queenside) ? 1 : 0;
+    k.x[InOutflanking] = std::abs(wk % 8 - bk % 8) - std::abs(wk / 8 - bk / 8);
+    k.x[InInfiltration] = (wk / 8 >= 4 || bk / 8 <= 3) ? 1 : 0;
+    bool pieces = false;
+    for (int c = 0; c < 2; ++c)
+        for (int t = 1; t <= 4; ++t) pieces |= ai.pieces[c][t] != 0;
+    k.x[InPawnsOnly] = pieces ? 0 : 1;
+    k.x[InAlmostUnwinnable] = (k.x[InOutflanking] < 0 && !k.x[InBothFlanks]) ? 1 : 0;
+    k.x[InBias] = 1;
+    return k;
+}
+inline int initiative_value(const InitSignals& k) {
+    int c = 0;
+    for (int i = 0; i < InCount; ++i) c += InitWeight[i] * k.x[i];
+    return c;
+}
+inline Score apply_initiative(Score eg, int c) {
+    if (eg == 0) return eg;
+    const int sgn = eg > 0 ? 1 : -1;
+    return eg + sgn * std::max(c, -std::abs(eg));
+}
+
+// ---- Endgame scale factors (EV_SCALE2) --------------------------------------
+enum ScaleCat : std::uint8_t {
+    ScFewPawns, ScFewPawnsOcb, ScOcbOnly, ScQueenVsMinors, ScNoPawns, ScZero, ScKrkp, ScKqkp, ScNormal
+};
+struct ScaleInfo {
+    std::uint8_t cat = ScNormal;
+    std::uint8_t cnt = 0;
+};
+
+// Which scale factor applies when side `strong` is ahead.
+inline ScaleInfo scale_info(const AttackInfo& ai, int strong) {
+    using namespace bb;
+    const int weak = strong ^ 1;
+    auto npm = [&](int c) {
+        return popcount(ai.pieces[c][1]) * PieceValueMG[1] + popcount(ai.pieces[c][2]) * PieceValueMG[2] +
+               popcount(ai.pieces[c][3]) * PieceValueMG[3] + popcount(ai.pieces[c][4]) * PieceValueMG[4];
+    };
+    const int npm_s = npm(strong), npm_w = npm(weak);
+    const int pawns_s = popcount(ai.pieces[strong][0]), pawns_w = popcount(ai.pieces[weak][0]);
+    const int ks = lsb(ai.pieces[strong][5]), kw = lsb(ai.pieces[weak][5]);
+    const bool strong_white = strong == 0;
+
+    // KPK: exact, from the table.
+    if (npm_s == 0 && npm_w == 0 && pawns_s + pawns_w == 1) {
+        const int pside = pawns_s ? strong : weak;
+        int wk = lsb(ai.pieces[pside][5]), bk = lsb(ai.pieces[pside ^ 1][5]), wp = lsb(ai.pieces[pside][0]);
+        if (pside == 1) { wk ^= 56; bk ^= 56; wp ^= 56; }
+        const bool win = Kpk::get().win(ai.stm == pside ? 0 : 1, wk, bk, wp);
+        return {static_cast<std::uint8_t>(win && pside == strong ? ScNormal : ScZero), 0};
+    }
+    // Bishop and rook pawns of the wrong colour vs a king in the corner.
+    if (npm_s == PieceValueMG[2] && ai.pieces[strong][2] && pawns_s && npm_w == 0) {
+        const U64 ps = ai.pieces[strong][0];
+        for (int f : {0, 7})
+            if ((ps & ~file_mask(f)) == 0) {
+                const int q = f + (strong_white ? 56 : 0);
+                const bool bishop_dark = (ai.pieces[strong][2] & DarkSquares) != 0;
+                const bool q_dark = ((DarkSquares >> q) & 1) != 0;
+                if (bishop_dark != q_dark && distance(kw, q) <= 1) return {ScZero, 0};
+            }
+    }
+    // KRKP / KQKP with the pawn far advanced and supported by its king.
+    if (pawns_s == 0 && npm_w == 0 && pawns_w == 1 &&
+        ((npm_s == PieceValueMG[3] && ai.pieces[strong][3]) || (npm_s == PieceValueMG[4] && ai.pieces[strong][4]))) {
+        const int pw = lsb(ai.pieces[weak][0]);
+        const int r = rel_rank(pw, !strong_white);  // from the pawn's side
+        const int qsq = pw % 8 + (strong_white ? 0 : 56);
+        if (ai.pieces[strong][3]) {
+            const bool in_front = (M.forward_file[weak][pw] & (1ULL << ks)) != 0;
+            if (r >= 4 && distance(kw, pw) <= 1 && distance(ks, qsq) >= 3 && !in_front) return {ScKrkp, 0};
+        } else {
+            const int f = pw % 8;
+            if (r == 6 && (f == 0 || f == 2 || f == 5 || f == 7) && distance(kw, pw) <= 1 && distance(ks, pw) >= 3)
+                return {ScKqkp, 0};
+        }
+    }
+    // No pawns and at most a minor piece ahead.
+    if (pawns_s == 0 && npm_s - npm_w <= PieceValueMG[2])
+        return {static_cast<std::uint8_t>(npm_s < PieceValueMG[3] ? ScZero : ScNoPawns), 0};
+    // Opposite-coloured bishops.
+    const U64 wb = ai.pieces[0][2], blb = ai.pieces[1][2];
+    const bool ocb = popcount(wb) == 1 && popcount(blb) == 1 && (((wb & DarkSquares) != 0) != ((blb & DarkSquares) != 0));
+    if (ocb && npm_s == PieceValueMG[2] && npm_w == PieceValueMG[2]) {
+        const int passed = popcount(passed_pawns(ai, 0)) + popcount(passed_pawns(ai, 1));
+        return {ScOcbOnly, static_cast<std::uint8_t>(passed)};
+    }
+    // One queen against minor pieces only.
+    const int queens = popcount(ai.pieces[0][4]) + popcount(ai.pieces[1][4]);
+    if (queens == 1) {
+        const int qside = ai.pieces[0][4] ? 0 : 1, other = qside ^ 1;
+        const int minors = popcount(ai.pieces[other][1] | ai.pieces[other][2]);
+        if (minors && !ai.pieces[other][3])
+            return {ScQueenVsMinors, static_cast<std::uint8_t>(minors)};
+    }
+    return {static_cast<std::uint8_t>(ocb ? ScFewPawnsOcb : ScFewPawns), static_cast<std::uint8_t>(pawns_s)};
+}
+
+// Scale factor (0..64) for a category with the given parameters (engine ints or tuner doubles).
+template <typename T>
+inline T scale_from(const ScaleInfo& si, const T* p) {
+    T v = 64;
+    switch (si.cat) {
+        case ScFewPawns: v = std::min<T>(64, p[0] + p[1] * si.cnt); break;
+        case ScFewPawnsOcb: v = std::min<T>(64, p[0] + p[2] * si.cnt); break;
+        case ScOcbOnly: v = std::min<T>(64, p[3] + p[4] * si.cnt); break;
+        case ScQueenVsMinors: v = std::min<T>(64, p[5] + p[6] * si.cnt); break;
+        case ScNoPawns: v = p[7]; break;
+        case ScZero: v = 0; break;
+        case ScKrkp: v = p[8]; break;
+        case ScKqkp: v = p[9]; break;
+        default: break;
+    }
+    return std::max<T>(0, v);
 }
 
 // All positional terms, white minus black, plus the endgame scale factor.
@@ -1153,7 +1990,9 @@ inline Score white_view(const chess::Board& board, const Terms& t) {
     const MgEg b = side_totals(t.side[1], p.ai.slider[1]);
     const Score mg = w.mg - b.mg + p.score.mg;
     Score eg = w.eg - b.eg + p.score.eg;
-    eg = eg * endgame_scale(p.ai, eg) / 64;
+    if (EvalUseInitiative) eg = apply_initiative(eg, initiative_value(initiative_signals(p.ai)));
+    if (EvalUseScale2) eg = eg * scale_from(scale_info(p.ai, eg > 0 ? 0 : 1), ScaleParam) / 64;
+    else eg = eg * endgame_scale(p.ai, eg) / 64;
     Score s = taper(mg, eg, t.phase());
     if (EvalUseTempo) s += board.sideToMove() == chess::Color::WHITE ? Tempo : -Tempo;
     return fifty_move_scale(s, static_cast<int>(board.halfMoveClock()));

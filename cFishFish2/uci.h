@@ -346,7 +346,19 @@ struct Options {
 struct TimeBudget {
     TimeMs soft = -1;
     TimeMs hard = -1;
+    bool clock = false;  // from the game clock (not movetime): soft may be scaled
 };
+
+// Time management (SR_TM): the soft limit is scaled by how settled the
+// search looks: less time while the best move stays the same from one
+// iteration to the next, more when it just changed or the score is falling.
+// Tested on a real clock (tools/match "c<base>+<inc>") vs. the fixed budget:
+// 300 games @2s+20ms +9; 600 @2s+20ms about +12; 600 @4s+40ms about +24
+// (1200 games about +18, LOS 99%). On.
+#ifndef SR_TM
+#define SR_TM 1
+#endif
+inline constexpr bool UseTimeManagement = SR_TM;
 
 inline TimeBudget allocate_time(const SearchLimits& lim, bool white, int overhead) {
     TimeBudget tb;
@@ -367,6 +379,7 @@ inline TimeBudget allocate_time(const SearchLimits& lim, bool white, int overhea
 
     tb.soft = std::clamp<TimeMs>(usable / mtg + inc * 3 / 4, 1, cap);
     tb.hard = std::clamp<TimeMs>(tb.soft * 3, 1, cap);
+    tb.clock = true;
     return tb;
 }
 
@@ -386,6 +399,24 @@ struct SearchContext {
 
     TimeMs elapsed() const { return now_ms() - start.load(); }
 
+    // SR_TM state, updated from each completed line 1.
+    mutable std::uint16_t tm_best = 0;
+    mutable int tm_stable = 0;      // iterations the best move has stayed the same
+    mutable int tm_prev_score = 0;
+    mutable int tm_depth = 0;
+    mutable double tm_scale = 1.0;
+    void tm_update(int depth, std::uint16_t best, int score) const {
+        if (depth <= tm_depth) return;
+        tm_stable = (tm_depth > 0 && best == tm_best) ? tm_stable + 1 : 0;
+        const int drop = tm_depth > 0 ? tm_prev_score - score : 0;
+        tm_best = best;
+        tm_prev_score = score;
+        tm_depth = depth;
+        const double stab = std::clamp(1.3 - 0.12 * tm_stable, 0.6, 1.3);
+        const double fall = std::clamp(1.0 + drop / 100.0, 1.0, 1.5);
+        tm_scale = depth >= 4 ? stab * fall : 1.0;
+    }
+
     // Hard stop: GUI said stop, node limit hit, or hard time limit passed.
     bool should_stop(std::uint64_t nodes) const {
         if (stop.load(std::memory_order_relaxed)) return true;
@@ -401,7 +432,12 @@ struct SearchContext {
         if (stop.load()) return false;
         if (next_depth > MaxDepth) return false;
         if (limits.depth > 0 && next_depth > limits.depth) return false;
-        if (!pondering.load() && budget.soft >= 0 && elapsed() >= budget.soft) return false;
+        if (!pondering.load() && budget.soft >= 0) {
+            TimeMs soft = budget.soft;
+            if (UseTimeManagement && budget.clock)
+                soft = std::min<TimeMs>(budget.hard, static_cast<TimeMs>(static_cast<double>(soft) * tm_scale));
+            if (elapsed() >= soft) return false;
+        }
         return true;
     }
 
@@ -470,6 +506,7 @@ inline SearchResult run_search(SearchContext& ctx) {
         for (const auto& m : line.pv) pv.push_back(chess::uci::moveToUci(m, board.chess960()));
         const int mate = search::is_mate_score(line.score) ? search::mate_in_moves(line.score) : 0;
         ctx.info_pv(depth, seldepth, multipv, line.score, mate, nodes + helper_nodes.load(), pv, hashfull);
+        if (multipv == 1 && !line.pv.empty()) ctx.tm_update(depth, line.pv.front().move(), line.score);
     };
 
     // Lazy SMP helpers (Threads > 1): same position, shared TT, stopped when
