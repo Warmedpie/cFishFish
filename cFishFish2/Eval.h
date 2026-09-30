@@ -622,6 +622,11 @@ inline MgEg slider_mobility(const chess::Board& b, chess::Color c) {
 //   formula: +37, +48 on new openings (1200 games +42, LOS 100%); EG suite +6.
 //   shelter / storm: -32.   both: +8.
 // Adopted: the formula. Shelter / storm off.
+// Queen-distance king-danger signal (EV_KD_QDIST): our queen far from our
+// king while enemy pieces hit the king zone (see KdQueenAway).
+#ifndef EV_KD_QDIST
+#define EV_KD_QDIST 0
+#endif
 #ifndef EV_KDANGER2
 #define EV_KDANGER2 1
 #endif
@@ -704,6 +709,7 @@ inline constexpr bool EvalUseTempo         = EV_TEMPO;
 inline constexpr bool EvalUseSpace         = EV_SPACE;
 inline constexpr bool EvalUseScaling       = EV_SCALING;
 inline constexpr bool EvalUseDanger2       = EV_KDANGER2;
+inline constexpr bool EvalUseKdQueenDist   = EV_KD_QDIST;
 inline constexpr bool EvalUseScale2        = EV_SCALE2;
 inline constexpr bool EvalUseConnected     = EV_CONNECTED;
 inline constexpr bool EvalUseThreats2      = EV_THREATS2;
@@ -795,7 +801,7 @@ inline constexpr MgEg RookPerPawn = {5, -6};          // per rook, per own pawn 
 // King danger formula (EV_KDANGER2), for one king. danger = sum of
 // KdWeight[i] * signal i (signals: KdFeature below); penalty = danger^2 / 1024
 // in the middlegame and danger * KdEgSlope / 64 in the endgame, when danger > 0.
-inline constexpr int KdWeight[17] = {25, 0, 2, -3, 21, 15, 152, 78, 167, 139, 31, 6, -14, 59, -49, -201, 198};
+inline constexpr int KdWeight[18] = {25, 0, 2, -3, 21, 15, 152, 78, 167, 139, 31, 6, -14, 59, -49, -201, 198, 0};
 inline constexpr int KdEgSlope = 9;
 
 // Pawn shelter / storm (EV_SHELTER), mg, per file of the three in front of
@@ -1147,9 +1153,10 @@ enum KdFeature {
     KdKnightDefender,  // one of our knights guards a square next to the king (0/1)
     KdNoQueen,         // the enemy has no queen (0/1)
     KdBias,            // always 1
+    KdQueenAway,       // (EV_KD_QDIST) our queen's distance from our king x min(enemy pieces hitting the zone, 2)
     KdCount
 };
-static_assert(KdCount == 17);
+static_assert(KdCount == 18);
 
 struct KdSignals {
     int x[KdCount]{};
@@ -1234,6 +1241,8 @@ inline KdSignals danger2_signals(const AttackInfo& ai, int c) {
     k.x[KdKnightDefender] = (ai.by[c][1] & ring) ? 1 : 0;
     k.x[KdNoQueen] = ai.pieces[them][4] ? 0 : 1;
     k.x[KdBias] = 1;
+    if (EvalUseKdQueenDist && ai.pieces[c][4])
+        k.x[KdQueenAway] = distance(lsb(ai.pieces[c][4]), ksq) * std::min(ai.king_attackers[them], 2);
     return k;
 }
 
@@ -1441,7 +1450,140 @@ inline void passed2(const AttackInfo& ai, int c, F&& f) {
     }
 }
 
-inline TermScores side_positional(const AttackInfo& ai, int c) {
+// ---- Pawn-only terms --------------------------------------------------------
+// Everything in side c's evaluation that depends only on the two pawn
+// bitboards: structure, the pawn-only part of passed / candidate pawns, space.
+struct PawnSide {
+    MgEg structure{};  // TermStructure
+    MgEg passed{};     // TermPassed: per-rank bonus, protected, outside, candidates
+    int space = 0;     // TermSpace (mg)
+    bb::U64 passers = 0;
+};
+
+inline PawnSide pawn_side(const AttackInfo& ai, int c) {
+    using namespace bb;
+    PawnSide ps;
+    auto add = [](MgEg& t, const MgEg& v, int n = 1) {
+        t.mg += v.mg * n;
+        t.eg += v.eg * n;
+    };
+    const bool white = (c == 0);
+    const int them = c ^ 1;
+    const U64 ours_p = ai.pieces[c][0], theirs_p = ai.pieces[them][0];
+    const U64 our_attacks = pawn_attacks(ours_p, white), their_attacks = pawn_attacks(theirs_p, !white);
+    U64 pawns = ours_p;
+    while (pawns) {
+        const int sq = lsb(pawns);
+        pawns &= pawns - 1;
+        const int f = sq % 8, r = rel_rank(sq, white);
+        const U64 bit = 1ULL << sq;
+
+        if (EvalUsePawnStructure) {
+            const bool isolated = (adjacent_files(f) & ours_p) == 0;
+            if (isolated) add(ps.structure, IsolatedPawn);
+            if (M.forward_file[c][sq] & ours_p) add(ps.structure, DoubledPawn);  // another own pawn ahead
+            if (!isolated) {
+                // Backward: no own pawn on an adjacent file level or behind, and
+                // the stop square is attacked by an enemy pawn.
+                const U64 behind_or_level = ~ranks_ahead(sq / 8, white);
+                const int stop = white ? sq + 8 : sq - 8;
+                if ((adjacent_files(f) & behind_or_level & ours_p) == 0 && stop >= 0 && stop < 64 &&
+                    (their_attacks & (1ULL << stop)))
+                    add(ps.structure, BackwardPawn);
+            }
+            if (EvalUseConnected)
+                pawn_links(ai, c, sq, [&](int kind, int i, int n) {
+                    switch (kind) {
+                        case 0: ps.structure.mg += PhalanxMG[i]; ps.structure.eg += PhalanxEG[i]; break;
+                        case 1: ps.structure.mg += SupportedMG[i]; ps.structure.eg += SupportedEG[i]; break;
+                        case 2: add(ps.structure, SupportCount, n); break;
+                        case 3: add(ps.structure, ConnectedOpposed); break;
+                        case 4: add(ps.structure, WeakUnopposed); break;
+                        default: add(ps.structure, WeakLever); break;
+                    }
+                });
+        }
+
+        const bool passed = (M.passed[c][sq] & theirs_p) == 0 && (M.forward_file[c][sq] & ours_p) == 0;
+        if (passed) ps.passers |= bit;
+        if (EvalUsePassed && passed) {
+            ps.passed.mg += PassedMG[r];
+            ps.passed.eg += PassedEG[r];
+            if (our_attacks & bit) add(ps.passed, PassedProtected);
+            if (EvalUsePassedExtra && (f <= 1 || f >= 6)) {
+                // Outside passer: on a wing, away from the enemy pawns, so it
+                // drags the enemy king away from everything else.
+                U64 near = 0;
+                for (int df = -1; df <= 1; ++df)
+                    if (f + df >= 0 && f + df <= 7) near |= file_mask(f + df);
+                if (theirs_p && (theirs_p & near) == 0) ps.passed.eg += PassedOutsideEG;
+            }
+        } else if (EvalUseCandidate && (M.forward_file[c][sq] & (ours_p | theirs_p)) == 0) {
+            // Candidate: half-open file, and at least as many own pawns able to
+            // support its advance as enemy pawns guarding its path.
+            const int sentries = popcount(M.attack_span[c][sq] & theirs_p);
+            const int helpers = popcount(adjacent_files(f) & ~ranks_ahead(sq / 8, white) & ours_p);
+            if (helpers >= sentries) ps.passed.eg += CandidateEG[r];
+        }
+    }
+
+    // Space: safe central squares in our half (files c-f, ranks 2-4), squares
+    // behind our own pawns counting double.
+    if (EvalUseSpace) {
+        const U64 area = (file_mask(2) | file_mask(3) | file_mask(4) | file_mask(5)) &
+                         (white ? (rank_mask(1) | rank_mask(2) | rank_mask(3))
+                                : (rank_mask(6) | rank_mask(5) | rank_mask(4)));
+        const U64 safe = area & ~ours_p & ~their_attacks;
+        U64 behind = ours_p;
+        for (int i = 0; i < 3; ++i) behind |= white ? (behind >> 8) : (behind << 8);
+        ps.space = SpacePerSquare * (popcount(safe) + popcount(safe & behind));
+    }
+    return ps;
+}
+
+// Pawn hash (SP_PAWN_HASH): pawn_side() for both colours, keyed by the two
+// pawn bitboards themselves (stored whole, so there are no false hits).
+// One table per thread.
+#ifndef SP_PAWN_HASH
+#define SP_PAWN_HASH 1
+#endif
+inline constexpr bool UsePawnHash = SP_PAWN_HASH;
+
+class PawnHash {
+public:
+    static constexpr std::size_t Size = 1 << 13;  // entries (~0.6 MB)
+    const PawnSide* probe(const AttackInfo& ai) {
+        const bb::U64 wp = ai.pieces[0][0], bp = ai.pieces[1][0];
+        Entry& e = table_[index(wp, bp)];
+        if (!e.used || e.wp != wp || e.bp != bp) {
+            e.wp = wp;
+            e.bp = bp;
+            e.used = true;
+            e.side[0] = pawn_side(ai, 0);
+            e.side[1] = pawn_side(ai, 1);
+        }
+        return e.side;
+    }
+    static PawnHash& local() {
+        static thread_local PawnHash h;
+        return h;
+    }
+
+private:
+    struct Entry {
+        bb::U64 wp = 0, bp = 0;
+        PawnSide side[2];
+        bool used = false;
+    };
+    static std::size_t index(bb::U64 wp, bb::U64 bp) {
+        const bb::U64 x = (wp * 0x9E3779B97F4A7C15ULL) ^ (bp * 0xC2B2AE3D27D4EB4FULL);
+        return static_cast<std::size_t>(x >> 51) & (Size - 1);
+    }
+    std::vector<Entry> table_ = std::vector<Entry>(Size);
+};
+
+// ps: side c's pawn-only terms, if already known (pawn hash); nullptr = compute.
+inline TermScores side_positional(const AttackInfo& ai, int c, const PawnSide* ps = nullptr) {
     using namespace bb;
     TermScores ts;
     auto add = [&](Term term, const MgEg& v, int n = 1) {
@@ -1454,81 +1596,41 @@ inline TermScores side_positional(const AttackInfo& ai, int c) {
     const U64 occ = ai.occ[0] | ai.occ[1];
     const int our_k = lsb(ai.pieces[c][5]), their_k = lsb(ai.pieces[them][5]);
 
-    // Pawns: structure and passed pawns.
+    // Pawns: structure and passed pawns. The pawn-only part comes from
+    // pawn_side() (cached by the pawn hash when SP_PAWN_HASH is on); the
+    // terms that also depend on pieces and kings are added per passer here.
+    const PawnSide own_ps = ps ? PawnSide{} : pawn_side(ai, c);
+    const PawnSide& pw = ps ? *ps : own_ps;
+    ts.t[TermStructure].mg += pw.structure.mg;
+    ts.t[TermStructure].eg += pw.structure.eg;
+    ts.t[TermPassed].mg += pw.passed.mg;
+    ts.t[TermPassed].eg += pw.passed.eg;
     bool unstoppable = false;  // at least one passer the enemy king can't catch
-    U64 pawns = ours_p;
-    while (pawns) {
-        const int sq = lsb(pawns);
-        pawns &= pawns - 1;
+    for (U64 pp = EvalUsePassed ? pw.passers : 0; pp; pp &= pp - 1) {
+        const int sq = lsb(pp);
         const int f = sq % 8, r = rel_rank(sq, white);
         const U64 bit = 1ULL << sq;
-
-        if (EvalUsePawnStructure) {
-            const bool isolated = (adjacent_files(f) & ours_p) == 0;
-            if (isolated) add(TermStructure, IsolatedPawn);
-            if (M.forward_file[c][sq] & ours_p) add(TermStructure, DoubledPawn);  // another own pawn ahead
-            if (!isolated) {
-                // Backward: no own pawn on an adjacent file level or behind, and
-                // the stop square is attacked by an enemy pawn.
-                const U64 behind_or_level = ~ranks_ahead(sq / 8, white);
-                const int stop = white ? sq + 8 : sq - 8;
-                if ((adjacent_files(f) & behind_or_level & ours_p) == 0 && stop >= 0 && stop < 64 &&
-                    (ai.by[them][0] & (1ULL << stop)))
-                    add(TermStructure, BackwardPawn);
-            }
-            if (EvalUseConnected)
-                pawn_links(ai, c, sq, [&](int kind, int i, int n) {
-                    switch (kind) {
-                        case 0: ts.t[TermStructure].mg += PhalanxMG[i]; ts.t[TermStructure].eg += PhalanxEG[i]; break;
-                        case 1: ts.t[TermStructure].mg += SupportedMG[i]; ts.t[TermStructure].eg += SupportedEG[i]; break;
-                        case 2: add(TermStructure, SupportCount, n); break;
-                        case 3: add(TermStructure, ConnectedOpposed); break;
-                        case 4: add(TermStructure, WeakUnopposed); break;
-                        default: add(TermStructure, WeakLever); break;
-                    }
-                });
+        const int stop = white ? sq + 8 : sq - 8;
+        if (stop >= 0 && stop < 64) {
+            if (occ & (1ULL << stop)) add(TermPassed, PassedBlocked);
+            if ((M.forward_file[c][sq] & occ) == 0) ts.t[TermPassed].eg += PassedFreePathEG[r];
+            if (r >= 3)
+                ts.t[TermPassed].eg += PassedKingDistEG * (r - 2) * (distance(their_k, stop) * 2 - distance(our_k, stop));
         }
-
-        if (EvalUsePassed && (M.passed[c][sq] & theirs_p) == 0 && (M.forward_file[c][sq] & ours_p) == 0) {
-            ts.t[TermPassed].mg += PassedMG[r];
-            ts.t[TermPassed].eg += PassedEG[r];
-            if (ai.by[c][0] & bit) add(TermPassed, PassedProtected);
-            const int stop = white ? sq + 8 : sq - 8;
-            if (stop >= 0 && stop < 64) {
-                if (occ & (1ULL << stop)) add(TermPassed, PassedBlocked);
-                if ((M.forward_file[c][sq] & occ) == 0) ts.t[TermPassed].eg += PassedFreePathEG[r];
-                if (r >= 3)
-                    ts.t[TermPassed].eg += PassedKingDistEG * (r - 2) * (distance(their_k, stop) * 2 - distance(our_k, stop));
+        if (EvalUseRooks) {
+            const U64 behind = file_mask(f) & ~M.forward_file[c][sq] & ~bit;
+            if (behind & ai.pieces[c][3]) add(TermRooks, RookBehindPasser);
+        }
+        if (EvalUsePassedExtra) {
+            // Unstoppable (rule of the square) when the opponent has no pieces.
+            const bool them_no_pieces =
+                (ai.pieces[them][1] | ai.pieces[them][2] | ai.pieces[them][3] | ai.pieces[them][4]) == 0;
+            if (them_no_pieces && (M.forward_file[c][sq] & occ) == 0) {
+                const int promo = white ? 56 + f : f;
+                const int moves = std::min(7 - r, 5);
+                const int kd = distance(their_k, promo) - (ai.stm == them ? 1 : 0);
+                if (kd > moves) unstoppable = true;
             }
-            if (EvalUseRooks) {
-                const U64 behind = file_mask(f) & ~M.forward_file[c][sq] & ~bit;
-                if (behind & ai.pieces[c][3]) add(TermRooks, RookBehindPasser);
-            }
-            if (EvalUsePassedExtra) {
-                // Outside passer: on a wing, away from the enemy pawns, so it
-                // drags the enemy king away from everything else.
-                if ((f <= 1 || f >= 6)) {
-                    U64 near = 0;
-                    for (int df = -1; df <= 1; ++df)
-                        if (f + df >= 0 && f + df <= 7) near |= file_mask(f + df);
-                    if (theirs_p && (theirs_p & near) == 0) ts.t[TermPassed].eg += PassedOutsideEG;
-                }
-                // Unstoppable (rule of the square) when the opponent has no pieces.
-                const bool them_no_pieces =
-                    (ai.pieces[them][1] | ai.pieces[them][2] | ai.pieces[them][3] | ai.pieces[them][4]) == 0;
-                if (them_no_pieces && (M.forward_file[c][sq] & occ) == 0) {
-                    const int promo = white ? 56 + f : f;
-                    const int moves = std::min(7 - r, 5);
-                    const int kd = distance(their_k, promo) - (ai.stm == them ? 1 : 0);
-                    if (kd > moves) unstoppable = true;
-                }
-            }
-        } else if (EvalUseCandidate && (M.forward_file[c][sq] & (ours_p | theirs_p)) == 0) {
-            // Candidate: half-open file, and at least as many own pawns able to
-            // support its advance as enemy pawns guarding its path.
-            const int sentries = popcount(M.attack_span[c][sq] & theirs_p);
-            const int helpers = popcount(adjacent_files(f) & ~ranks_ahead(sq / 8, white) & ours_p);
-            if (helpers >= sentries) ts.t[TermPassed].eg += CandidateEG[r];
         }
     }
     if (unstoppable) ts.t[TermPassed].eg += UnstoppableEG;
@@ -1662,15 +1764,7 @@ inline TermScores side_positional(const AttackInfo& ai, int c) {
 
     // Space: safe central squares in our half (files c-f, ranks 2-4), squares
     // behind our own pawns counting double.
-    if (EvalUseSpace) {
-        const U64 area = (file_mask(2) | file_mask(3) | file_mask(4) | file_mask(5)) &
-                         (white ? (rank_mask(1) | rank_mask(2) | rank_mask(3))
-                                : (rank_mask(6) | rank_mask(5) | rank_mask(4)));
-        const U64 safe = area & ~ours_p & ~ai.by[them][0];
-        U64 behind = ours_p;
-        for (int i = 0; i < 3; ++i) behind |= white ? (behind >> 8) : (behind << 8);
-        ts.t[TermSpace].mg += SpacePerSquare * (popcount(safe) + popcount(safe & behind));
-    }
+    if (EvalUseSpace) ts.t[TermSpace].mg += pw.space;
     return ts;
 }
 
@@ -1963,8 +2057,9 @@ struct Positional {
 inline Positional positional(const chess::Board& b) {
     Positional p;
     p.ai = gather_attacks(b);
-    p.side[0] = side_positional(p.ai, 0);
-    p.side[1] = side_positional(p.ai, 1);
+    const PawnSide* ps = UsePawnHash ? PawnHash::local().probe(p.ai) : nullptr;
+    p.side[0] = side_positional(p.ai, 0, ps ? &ps[0] : nullptr);
+    p.side[1] = side_positional(p.ai, 1, ps ? &ps[1] : nullptr);
     const MgEg w = p.side[0].total(), bl = p.side[1].total();
     p.score = {w.mg - bl.mg, w.eg - bl.eg};
     return p;
@@ -1983,8 +2078,9 @@ inline Score fifty_move_scale(Score s, int halfmove_clock) {
     return s * (100 - std::min(halfmove_clock, 100)) / 100;
 }
 
-// White's point of view.
-inline Score white_view(const chess::Board& board, const Terms& t) {
+// White's point of view, before fifty-move scaling (which depends on the
+// halfmove clock, not part of the position key: the TT caches this value).
+inline Score white_view_unscaled(const chess::Board& board, const Terms& t) {
     const Positional p = positional(board);
     const MgEg w = side_totals(t.side[0], p.ai.slider[0]);
     const MgEg b = side_totals(t.side[1], p.ai.slider[1]);
@@ -1995,7 +2091,12 @@ inline Score white_view(const chess::Board& board, const Terms& t) {
     else eg = eg * endgame_scale(p.ai, eg) / 64;
     Score s = taper(mg, eg, t.phase());
     if (EvalUseTempo) s += board.sideToMove() == chess::Color::WHITE ? Tempo : -Tempo;
-    return fifty_move_scale(s, static_cast<int>(board.halfMoveClock()));
+    return s;
+}
+
+// White's point of view.
+inline Score white_view(const chess::Board& board, const Terms& t) {
+    return fifty_move_scale(white_view_unscaled(board, t), static_cast<int>(board.halfMoveClock()));
 }
 
 // ---------------------------------------------------------------------------
@@ -2037,6 +2138,26 @@ private:
 // Static evaluation for negamax / PVS: positive = good for the side to move.
 inline Score evaluate(const EvalBoard& board) {
     const Score s = white_view(board, board.terms());
+    return board.sideToMove() == chess::Color::WHITE ? s : -s;
+}
+
+// Material + piece-square part of the eval only (the incremental terms, no
+// attack / pawn / king-safety terms), side to move's view, with tempo. Cheap:
+// used for lazy evaluation in the quiescence search (SP_LAZY).
+inline Score fast_eval(const EvalBoard& board) {
+    const Terms& t = board.terms();
+    const SideTerms& w = t.side[0];
+    const SideTerms& b = t.side[1];
+    Score s = taper(w.material_mg + w.pst_mg + w.mobility_mg - b.material_mg - b.pst_mg - b.mobility_mg,
+                    w.material_eg + w.pst_eg + w.mobility_eg - b.material_eg - b.pst_eg - b.mobility_eg, t.phase());
+    if (board.sideToMove() != chess::Color::WHITE) s = -s;
+    return EvalUseTempo ? s + Tempo : s;
+}
+
+// Side to move's view before fifty-move scaling; evaluate() ==
+// fifty_move_scale(evaluate_unscaled(), halfmove clock).
+inline Score evaluate_unscaled(const EvalBoard& board) {
+    const Score s = white_view_unscaled(board, board.terms());
     return board.sideToMove() == chess::Color::WHITE ? s : -s;
 }
 

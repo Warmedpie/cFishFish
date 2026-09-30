@@ -8,6 +8,9 @@
 // Replacement: a slot holding an older search's entry or a shallower result
 // is overwritten; a deeper entry from the current search is kept.
 //
+// Each entry also caches the position's raw static eval (SP_TT_EVAL), so a
+// revisited node that doesn't cut off skips the evaluation.
+//
 // Shared by all search threads without locks. Each slot is two 64-bit words,
 // the data and (key XOR data), written and read with relaxed atomics. If two
 // threads write a slot at the same time, or a read sees half of a write, the
@@ -17,6 +20,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <climits>
 #include <cstdint>
 #include <memory>
 #include <new>
@@ -26,6 +30,8 @@
 #include "Eval.h"
 
 namespace search {
+
+inline constexpr std::int16_t TTNoEval = INT16_MIN;  // no eval stored (e.g. in check)
 
 enum class Bound : std::uint8_t {
     None,
@@ -40,7 +46,8 @@ struct TTEntry {
     std::int16_t score = 0;     // mate scores stored relative to this node
     std::int8_t depth = 0;      // remaining depth searched (0 = qsearch)
     Bound bound = Bound::None;
-    std::uint8_t generation = 0;  // which "go" wrote this entry
+    std::uint8_t generation = 0;  // which "go" wrote this entry (6 bits)
+    std::int16_t eval = TTNoEval;  // raw static eval, side to move's view
 };
 
 class TranspositionTable {
@@ -80,7 +87,8 @@ public:
     // Call once at the start of every "go" so old entries can be recognized
     // and replaced first.
     void new_search() {
-        if (++generation_ == 0) generation_ = 1;  // 0 marks never-written slots
+        generation_ = static_cast<std::uint8_t>((generation_ + 1) & 63);
+        if (generation_ == 0) generation_ = 1;  // 0 marks never-written slots
     }
 
     // Returns true and fills `out` if this key is in the table.
@@ -91,7 +99,16 @@ public:
         return true;
     }
 
-    void store(std::uint64_t key, chess::Move move, eval::Score score, int depth, Bound bound) {
+    // Like probe(), but also finds eval-only entries (Bound::None).
+    bool probe_any(std::uint64_t key, TTEntry& out) const {
+        TTEntry e;
+        if (!read(key & mask_, e) || e.key != key) return false;
+        out = e;
+        return true;
+    }
+
+    void store(std::uint64_t key, chess::Move move, eval::Score score, int depth, Bound bound,
+               int static_eval = TTNoEval) {
         const std::size_t i = key & mask_;
         TTEntry e;
         const bool valid = read(i, e);
@@ -101,6 +118,8 @@ public:
         // Keep the old best move if this search didn't find one (fail low).
         std::uint16_t m = move.move();
         if (m == 0 && same) m = e.move;
+        std::int16_t ev = static_cast<std::int16_t>(static_eval);
+        if (ev == TTNoEval && same) ev = e.eval;  // keep the eval we already had
 
         const bool replace = same ? (bound == Bound::Exact || depth + 2 >= e.depth)
                                   : (e.generation != generation_ || depth >= e.depth);
@@ -112,6 +131,7 @@ public:
         e.depth = static_cast<std::int8_t>(std::clamp(depth, 0, 127));
         e.bound = bound;
         e.generation = generation_;
+        e.eval = ev;
         write(i, e);
     }
 
@@ -130,7 +150,7 @@ public:
 
 private:
     struct Slot {
-        std::atomic<std::uint64_t> data{0};   // move | score | depth | bound | generation
+        std::atomic<std::uint64_t> data{0};   // move | score | depth | bound:2 generation:6 | eval
         std::atomic<std::uint64_t> check{0};  // key ^ data
     };
 
@@ -139,7 +159,8 @@ private:
                static_cast<std::uint64_t>(static_cast<std::uint16_t>(e.score)) << 16 |
                static_cast<std::uint64_t>(static_cast<std::uint8_t>(e.depth)) << 32 |
                static_cast<std::uint64_t>(static_cast<std::uint8_t>(e.bound)) << 40 |
-               static_cast<std::uint64_t>(e.generation) << 48;
+               static_cast<std::uint64_t>(e.generation & 63) << 42 |
+               static_cast<std::uint64_t>(static_cast<std::uint16_t>(e.eval)) << 48;
     }
 
     // Reads slot i; false if it is empty. e.key is recovered from the check
@@ -152,8 +173,9 @@ private:
         e.move = static_cast<std::uint16_t>(d);
         e.score = static_cast<std::int16_t>(static_cast<std::uint16_t>(d >> 16));
         e.depth = static_cast<std::int8_t>(static_cast<std::uint8_t>(d >> 32));
-        e.bound = static_cast<Bound>(static_cast<std::uint8_t>(d >> 40));
-        e.generation = static_cast<std::uint8_t>(d >> 48);
+        e.bound = static_cast<Bound>(static_cast<std::uint8_t>((d >> 40) & 3));
+        e.generation = static_cast<std::uint8_t>((d >> 42) & 63);
+        e.eval = static_cast<std::int16_t>(static_cast<std::uint16_t>(d >> 48));
         return true;
     }
 

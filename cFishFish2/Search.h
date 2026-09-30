@@ -35,6 +35,42 @@ using eval::Score;
 using eval::Infinite;
 using eval::Mate;
 
+// ---- Tunable search parameters ------------------------------------------------
+// SP_PARAM(name, value, min, max): a compile-time constant in normal builds.
+// Built with -DSP_TUNE=1, each is a variable exposed as a UCI spin option of
+// the same name, so an SPSA tuner can set it between games (tools/spsa.cpp).
+//
+// SPSA round 1: all 30 parameters, 6000 game pairs @20 ms/move (Fishtest-style
+// schedules, c_end = range/20, r_end = 0.002). Largest moves: LMR base
+// 0.75 -> 0.84, divisor 2.25 -> 2.04, first reduced move 3 -> 2; null move
+// min depth 3 -> 2, base R 3 -> 4; RFP margin 80 -> 72; history pruning
+// 2000 -> 1797; history-LMR divisor 4096 -> 4403. The values below are the
+// tuned ones. A/B vs. the untuned engine: 800 games @25 ms +307 -218 =275
+// (~+39), 600 games @100 ms +191 -137 =272 (~+31, LOS 99.8%).     ADOPTED
+#ifndef SP_TUNE
+#define SP_TUNE 0
+#endif
+struct TuneParam {
+    const char* name;
+    int* value;
+    int def, min, max;
+};
+inline std::vector<TuneParam>& tune_params() {
+    static std::vector<TuneParam> v;
+    return v;
+}
+inline bool tune_register(const char* name, int* value, int def, int min, int max) {
+    tune_params().push_back({name, value, def, min, max});
+    return true;
+}
+#if SP_TUNE
+#define SP_PARAM(name, value, lo, hi) \
+    inline int name = (value);        \
+    inline const bool name##_registered = tune_register(#name, &name, (value), (lo), (hi));
+#else
+#define SP_PARAM(name, value, lo, hi) inline constexpr int name = (value);
+#endif
+
 inline constexpr int MaxPly = 128;
 
 // Mate scores are Mate - ply (we mate) or -Mate + ply (we get mated).
@@ -176,6 +212,19 @@ inline bool see_ge(const chess::Board& b, const chess::Move& m, eval::Score thre
     return res != 0;
 }
 
+// Is `m` (e.g. a TT move, which may come from a key collision) legal here?
+// Generates only the legal moves of the piece type on its from-square.
+inline bool is_legal_move(const chess::Board& b, const chess::Move& m) {
+    if (m == chess::Move::NO_MOVE) return false;
+    const chess::Piece pc = b.at(m.from());
+    if (pc == chess::Piece::NONE || pc.color() != b.sideToMove()) return false;
+    chess::Movelist ml;
+    chess::movegen::legalmoves(ml, b, 1 << static_cast<int>(pc.type().internal()));
+    for (const auto& x : ml)
+        if (x == m) return true;
+    return false;
+}
+
 // Does `m` give check? Direct attack from the destination, or a discovered
 // attack by one of our sliders. Castling and en passant: make the move.
 inline bool gives_check(const chess::Board& b, const chess::Move& m) {
@@ -282,13 +331,39 @@ struct OrderTables {
 
 // Moves plus their order scores. next() does one step of selection sort:
 // only as much sorting as the search actually uses before a cutoff.
+#ifndef SP_SORT_AFTER
+#define SP_SORT_AFTER 0     // 0 = off; n = sort the rest of the list once n moves were picked
+#endif
+inline constexpr bool UseSortAfter = SP_SORT_AFTER > 0;
+inline constexpr int SortAfter = SP_SORT_AFTER;
+
 struct OrderedMoves {
     chess::Movelist moves;
-    std::array<int, 256> scores{};
+    std::array<int, 256> scores;  // filled by score_moves() before next() is used
 
     int size() const { return static_cast<int>(moves.size()); }
 
+    // Picks the best remaining move into slot i (selection sort: most nodes
+    // cut off after one or two moves). SP_SORT_AFTER: once that many moves
+    // were picked (probably an all-node, which tries everything), sort the
+    // rest once (stable insertion sort) instead of scanning for each pick.
     chess::Move next(int i) {
+        if (UseSortAfter && i >= SortAfter) {
+            if (i == SortAfter) {
+                for (int a = i + 1; a < size(); ++a) {
+                    const chess::Move m = moves[a];
+                    const int sc = scores[static_cast<std::size_t>(a)];
+                    int b = a - 1;
+                    for (; b >= i && scores[static_cast<std::size_t>(b)] < sc; --b) {
+                        moves[b + 1] = moves[b];
+                        scores[static_cast<std::size_t>(b + 1)] = scores[static_cast<std::size_t>(b)];
+                    }
+                    moves[b + 1] = m;
+                    scores[static_cast<std::size_t>(b + 1)] = sc;
+                }
+            }
+            return moves[i];
+        }
         int best = i;
         for (int j = i + 1; j < size(); ++j)
             if (scores[static_cast<std::size_t>(j)] > scores[static_cast<std::size_t>(best)]) best = j;
@@ -305,13 +380,13 @@ struct OrderedMoves {
 
 // Reverse futility pruning: at depth <= RfpMaxDepth, a non-PV node whose
 // static eval beats beta by RfpMargin per ply of depth is cut off.
-inline constexpr int RfpMaxDepth = 8;
-inline constexpr int RfpMargin   = 80;
+SP_PARAM(RfpMaxDepth, 8, 4, 12)
+SP_PARAM(RfpMargin, 72, 30, 160)
 
 // Null-move pruning: from this depth, reduction R = NmpBase + depth / NmpDiv.
-inline constexpr int NmpMinDepth = 3;
-inline constexpr int NmpBase     = 3;
-inline constexpr int NmpDiv      = 6;
+SP_PARAM(NmpMinDepth, 2, 1, 6)
+SP_PARAM(NmpBase, 4, 1, 6)
+SP_PARAM(NmpDiv, 6, 3, 12)
 
 // ---- "Improving" and the heuristics that use it ----------------------------
 // improving = our static eval is higher than it was two plies ago (our
@@ -326,6 +401,8 @@ inline constexpr int NmpDiv      = 6;
 //   LMP, limit x2, checks kept                 +23  (400, LOS 95%)   ON
 //   then, each on top of that LMP:
 //   RFP margin by improving                     -2  (600)            off
+//     re-tested @100 ms after the speed round + SPSA: +188 -151 =261
+//     (600, ~+21, LOS ~98%)                                           ON
 //   LMR +1 when not improving                   +3  (600)            off
 //   NMP below beta when improving               -1  (600)            off
 //   ProbCut                                     -4  (600)            off
@@ -334,7 +411,7 @@ inline constexpr int NmpDiv      = 6;
 // run of thousands of games to resolve. Aggressive LMP likely fails here
 // because quiet-move ordering is still basic (no continuation history).
 #ifndef SR_IMP_RFP
-#define SR_IMP_RFP 0
+#define SR_IMP_RFP 1
 #endif
 #ifndef SR_LMP
 #define SR_LMP 1
@@ -366,9 +443,10 @@ inline constexpr bool LmpKeepChecks   = SR_LMP_KEEP_CHECKS;  // LMP never skips 
 #ifndef SR_LMP_SCALE
 #define SR_LMP_SCALE 2
 #endif
-inline constexpr int LmpMaxDepth = SR_LMP_MAX_DEPTH;
+SP_PARAM(LmpMaxDepth, SR_LMP_MAX_DEPTH, 3, 12)
+SP_PARAM(LmpScale, 202, 80, 400)  // x100
 inline int lmp_limit(int depth, bool improving) {
-    return SR_LMP_SCALE * (3 + depth * depth) / (2 - (improving ? 1 : 0));
+    return LmpScale * (3 + depth * depth) / (100 * (2 - (improving ? 1 : 0)));
 }
 
 // ---- Move ordering statistics ------------------------------------------------
@@ -410,7 +488,7 @@ inline int lmp_limit(int depth, bool improving) {
 // Neither is a proven gain here; kept, switched off, for retesting at longer
 // time controls or after other search changes.
 #ifndef SR_SINGULAR
-#define SR_SINGULAR 0
+#define SR_SINGULAR 1
 #endif
 #ifndef SR_PAWN_EXT
 #define SR_PAWN_EXT 0
@@ -421,8 +499,9 @@ inline int lmp_limit(int depth, bool improving) {
 // searched one ply deeper. If even the other moves beat beta, cut off
 // ("multi-cut").
 inline constexpr bool UseSingular = SR_SINGULAR;
-inline constexpr int SingularMinDepth = 8;
-inline constexpr int SingularMargin = 2;
+SP_PARAM(SingularMinDepth, 8, 5, 12)
+SP_PARAM(SingularMarginX8, 15, 4, 48)  // singular beta = TT score - margin/8 * depth
+SP_PARAM(DoubleExtMargin, 21, 0, 80)   // double extension when this far below singular beta
 // Passed-pawn extension: a pawn push to the 7th rank is searched one ply deeper.
 inline constexpr bool UsePawnExt = SR_PAWN_EXT;
 
@@ -438,13 +517,16 @@ inline constexpr bool UseBigBonus       = SR_BIG_BONUS;  // history bonus 16d^2+
 inline constexpr int OrderCounter    = 700'000;
 
 // History bonus for a cutoff at `depth` (penalty = the negative).
+SP_PARAM(HistBonusMul, 17, 4, 48)
+SP_PARAM(HistBonusAdd, 34, 0, 128)
+SP_PARAM(HistBonusMax, 1544, 400, 4000)
 inline int history_bonus(int depth) {
-    return UseBigBonus ? std::min(16 * depth * depth + 32 * depth, 1600) : depth * depth;
+    return UseBigBonus ? std::min(HistBonusMul * depth * depth + HistBonusAdd * depth, HistBonusMax) : depth * depth;
 }
 #ifndef SR_HIST_LMR_DIV
-#define SR_HIST_LMR_DIV 4096
+#define SR_HIST_LMR_DIV 4403
 #endif
-inline constexpr int HistLmrDivisor  = SR_HIST_LMR_DIV;  // history units per ply of LMR
+SP_PARAM(HistLmrDivisor, SR_HIST_LMR_DIV, 1024, 16384)  // history units per ply of LMR
 
 inline constexpr int NmpImprovingMargin = 40;
 
@@ -469,6 +551,14 @@ inline constexpr int NmpImprovingMargin = 40;
 //   singular + negative + double extensions (25 ms): L1 +31, L2 -1, L3 -1 off
 // After the first two, the rest were within about +-15 Elo, below what
 // 600-game tests resolve; they stay here as switches for longer tests.
+// Re-tested at 100 ms/move (800 games each vs. the engine with aspiration +
+// pruning + time management):
+//   singular + negative + double extensions ~+20 (LOS ~98%), IIR ~+15
+//   (LOS ~94%), correction history ~+36 (LOS 99.9%); all three together
+//   +305 -139 =356 (~+73, LOS 100%). Against Stockfish 19 (4000 nodes),
+//   300 games, same openings: 23.0% vs. 19.5% (~+35).       ADOPTED (all three)
+// They need depth to pay off (at 10-25 ms they were about even), and real
+// games (e.g. 60+1) search much deeper than 100 ms.
 #ifndef SR_ASP
 #define SR_ASP 1            // aspiration windows at the root
 #endif
@@ -476,7 +566,7 @@ inline constexpr int NmpImprovingMargin = 40;
 #define SR_ASP_DELTA 12     // initial half-width (cp)
 #endif
 #ifndef SR_IIR
-#define SR_IIR 0            // internal iterative reduction: PV / cut node without a TT move
+#define SR_IIR 1            // internal iterative reduction: PV / cut node without a TT move
 #endif
 #ifndef SR_IIR_DEPTH
 #define SR_IIR_DEPTH 6
@@ -497,10 +587,10 @@ inline constexpr int NmpImprovingMargin = 40;
 #define SR_FUTP 1           // futility pruning of quiet moves (by reduced depth)
 #endif
 #ifndef SR_FUT_BASE
-#define SR_FUT_BASE 100
+#define SR_FUT_BASE 99
 #endif
 #ifndef SR_FUT_MUL
-#define SR_FUT_MUL 100
+#define SR_FUT_MUL 103
 #endif
 #ifndef SR_FUT_DEPTH
 #define SR_FUT_DEPTH 8
@@ -509,16 +599,16 @@ inline constexpr int NmpImprovingMargin = 40;
 #define SR_SEEP 1           // SEE pruning: quiets below -SR_SEE_QUIET*d^2, captures below -SR_SEE_CAP*d
 #endif
 #ifndef SR_SEE_QUIET
-#define SR_SEE_QUIET 20
+#define SR_SEE_QUIET 21
 #endif
 #ifndef SR_SEE_CAP
-#define SR_SEE_CAP 100
+#define SR_SEE_CAP 103
 #endif
 #ifndef SR_HISTP
 #define SR_HISTP 1          // history pruning: quiets with history < -SR_HISTP_MUL*depth
 #endif
 #ifndef SR_HISTP_MUL
-#define SR_HISTP_MUL 2000
+#define SR_HISTP_MUL 1797
 #endif
 #ifndef SR_HISTP_DEPTH
 #define SR_HISTP_DEPTH 4
@@ -527,25 +617,25 @@ inline constexpr int NmpImprovingMargin = 40;
 #define SR_RAZOR 1          // razoring: depth <= 3, eval + margin*depth < alpha -> qsearch
 #endif
 #ifndef SR_RAZOR_MARGIN
-#define SR_RAZOR_MARGIN 250
+#define SR_RAZOR_MARGIN 248
 #endif
 #ifndef SR_CORR
-#define SR_CORR 0           // correction history (pawn + non-pawn structure)
+#define SR_CORR 1           // correction history (pawn + non-pawn structure)
 #endif
 #ifndef SR_CORR_WP
-#define SR_CORR_WP 64
+#define SR_CORR_WP 61
 #endif
 #ifndef SR_CORR_WNP
-#define SR_CORR_WNP 48
+#define SR_CORR_WNP 53
 #endif
 #ifndef SR_LMR2
 #define SR_LMR2 0           // LMR: bad captures too, killers/counter less, deeper/shallower re-search
 #endif
 #ifndef SR_SE_NEG
-#define SR_SE_NEG 0         // singular: negative extension when the TT move isn't singular
+#define SR_SE_NEG 1         // singular: negative extension when the TT move isn't singular
 #endif
 #ifndef SR_SE_DOUBLE
-#define SR_SE_DOUBLE 0      // singular: double extension when far below singular beta
+#define SR_SE_DOUBLE 1      // singular: double extension when far below singular beta
 #endif
 #ifndef SR_ORD2
 #define SR_ORD2 0           // quiet ordering: check bonus, threat escape, 4-ply continuation history
@@ -563,23 +653,28 @@ inline constexpr int NmpImprovingMargin = 40;
 #define SR_CHECK_EXT 1      // +1 ply in check
 #endif
 inline constexpr bool UseAsp = SR_ASP;
-inline constexpr int AspDelta = SR_ASP_DELTA;
+SP_PARAM(AspDelta, SR_ASP_DELTA, 5, 40)
 inline constexpr bool UseIir = SR_IIR;
-inline constexpr int IirDepth = SR_IIR_DEPTH;
+SP_PARAM(IirDepth, SR_IIR_DEPTH, 3, 10)
 inline constexpr bool UseLmrCut = SR_LMR_CUT;
 inline constexpr bool UseNmpCut = SR_NMP_CUT;
 inline constexpr bool UseNmp2 = SR_NMP2;
 inline constexpr int NmpEvalDiv = SR_NMP_EVDIV;
 inline constexpr bool UseFutPrune = SR_FUTP;
-inline constexpr int FutBase = SR_FUT_BASE, FutMul = SR_FUT_MUL, FutDepth = SR_FUT_DEPTH;
+SP_PARAM(FutBase, SR_FUT_BASE, 20, 250)
+SP_PARAM(FutMul, SR_FUT_MUL, 40, 250)
+SP_PARAM(FutDepth, SR_FUT_DEPTH, 3, 12)
 inline constexpr bool UseSeePrune = SR_SEEP;
-inline constexpr int SeeQuietMul = SR_SEE_QUIET, SeeCapMul = SR_SEE_CAP;
+SP_PARAM(SeeQuietMul, SR_SEE_QUIET, 5, 60)
+SP_PARAM(SeeCapMul, SR_SEE_CAP, 30, 250)
 inline constexpr bool UseHistPrune = SR_HISTP;
-inline constexpr int HistPruneMul = SR_HISTP_MUL, HistPruneDepth = SR_HISTP_DEPTH;
+SP_PARAM(HistPruneMul, SR_HISTP_MUL, 500, 8000)
+SP_PARAM(HistPruneDepth, SR_HISTP_DEPTH, 2, 8)
 inline constexpr bool UseRazor = SR_RAZOR;
-inline constexpr int RazorMargin = SR_RAZOR_MARGIN;
+SP_PARAM(RazorMargin, SR_RAZOR_MARGIN, 80, 600)
 inline constexpr bool UseCorr = SR_CORR;
-inline constexpr int CorrWPawn = SR_CORR_WP, CorrWNonPawn = SR_CORR_WNP;
+SP_PARAM(CorrWPawn, SR_CORR_WP, 8, 192)
+SP_PARAM(CorrWNonPawn, SR_CORR_WNP, 8, 192)
 inline constexpr bool UseLmr2 = SR_LMR2;
 inline constexpr bool UseSeNeg = SR_SE_NEG;
 inline constexpr bool UseSeDouble = SR_SE_DOUBLE;
@@ -593,6 +688,52 @@ inline constexpr bool UseCheckExt = SR_CHECK_EXT;
 inline constexpr bool UseMovePruning = UseFutPrune || UseSeePrune || UseHistPrune;
 inline constexpr int CorrLimit = 1024;  // correction-history entries in [-CorrLimit, CorrLimit]
 
+// ---- Speed round (NPS work). Measured as instructions per node (callgrind,
+// bench depth 9, start-up excluded) so machine noise doesn't hide small wins:
+//   baseline                                              6620
+//   SP_TT_EVAL: static eval cached in TT entries            6004  (-9.3%)
+//   SP_STAGED: TT move searched before move generation      5870  (-2.2%)
+//   SP_PAWN_HASH (Eval.h): pawn-only terms cached           5553  (-6.9%)
+//   move scores not zero-filled; gives_check() only when
+//   a pruning rule would fire                               5370  (-3.3%)
+//   total                                                  -18.9%
+// Everything but SP_STAGED (which orders quiets with fresher killers /
+// history) gives identical node counts. Not kept: lazy qsearch eval (SP_LAZY,
+// +4.7% nodes), lazy SEE in the picker (+0.2%), sorting the list after N
+// picks (SP_SORT_AFTER, nodes +2-3%).
+// A/B vs. the engine before, 800 games @25 ms: +304 -221 =275 (~+36 Elo).
+// Eval-only TT entries (SP_TT_EVAL=2, -2% instructions), tested later @100 ms
+// vs. the SPSA-tuned engine: +175 -135 =290 (600, ~+23, LOS ~99%): ON.
+//
+// Round 3: switches that were off, re-tested @100 ms/move vs. the speed +
+// SPSA engine (300-game screens, adjudicated): mate distance pruning +6,
+// null move only at cut nodes -8, ProbCut -14, eval-only TT entries +31,
+// LMR +1 at cut nodes -2, eval-based null-move R -16, RFP by improving +19,
+// LMR by improving -6, NMP by improving -3, richer LMR +23 (then -9: ~+7 over
+// 600, off), capture history +8, ordering signals -13, pawn-push extension
+// +10, fail-high blend +2. Adopted: eval-only TT entries + RFP by improving
+// (each ~+21..23 over 600 games; together +179 -149 =272, 600, ~+17).
+#ifndef SP_TT_EVAL
+#define SP_TT_EVAL 2        // reuse the raw static eval cached in the TT entry
+#endif                      // (2: also store an eval-only entry when the node had none)
+inline constexpr bool UseTtEval = SP_TT_EVAL >= 1;
+inline constexpr bool UseTtEval2 = SP_TT_EVAL >= 2;
+#ifndef SP_STAGED
+#define SP_STAGED 1         // search a legal TT move before generating the other moves
+#endif
+inline constexpr bool UseStaged = SP_STAGED;
+#ifndef SP_LAZY
+#define SP_LAZY 0           // qsearch lazy eval: material+PST only when that is SP_LAZY_MARGIN outside the window
+#endif                      // tested: -1.8% instructions/node but +4.7% nodes to the same depth: off
+#ifndef SP_LAZY_MARGIN
+#define SP_LAZY_MARGIN 500  // full eval - fast eval: 99% within 360 cp, 99.9% within 480 (SF-labelled sets)
+#endif
+inline constexpr bool UseLazy = SP_LAZY;
+// Also tried: SEE-testing captures only when picked (lazy SEE in the move
+// picker): same order, but +0.2% instructions/node (most captures that are
+// scored get picked anyway). Not kept.
+inline constexpr int LazyMargin = SP_LAZY_MARGIN;
+
 // ProbCut: at depth >= ProbCutMinDepth, a capture that beats
 // beta + ProbCutMargin (- ProbCutImproving if improving) in a search
 // reduced by ProbCutReduction probably beats beta at full depth too.
@@ -603,27 +744,32 @@ inline constexpr int ProbCutImproving = 50;
 
 // Delta pruning (quiescence search): skip a capture if stand pat + the
 // captured piece's value + DeltaMargin still can't reach alpha.
-inline constexpr int DeltaMargin = 200;
+SP_PARAM(DeltaMargin, 200, 50, 500)
 
 // Late move reductions: from this depth, quiet moves after the first
 // LmrMinMoves moves are reduced by the log formula below.
 inline constexpr int LmrMinDepth = 3;
-inline constexpr int LmrMinMoves = 3;
-inline constexpr double LmrBase    = 0.75;
-inline constexpr double LmrDivisor = 2.25;
+SP_PARAM(LmrMinMoves, 2, 1, 6)
+SP_PARAM(LmrBaseX100, 84, 0, 200)      // reduction = base + ln(depth) * ln(move number) / divisor
+SP_PARAM(LmrDivisorX100, 204, 120, 400)
 
-// reduction = LmrBase + ln(depth) * ln(move number) / LmrDivisor
-inline int lmr_reduction(int depth, int move_number) {
-    static const auto table = [] {
-        std::array<std::array<int, 64>, 64> t{};
-        for (int d = 1; d < 64; ++d)
-            for (int m = 1; m < 64; ++m)
-                t[static_cast<std::size_t>(d)][static_cast<std::size_t>(m)] =
-                    static_cast<int>(LmrBase + std::log(d) * std::log(m) / LmrDivisor);
-        return t;
-    }();
-    return table[static_cast<std::size_t>(std::min(depth, 63))][static_cast<std::size_t>(std::min(move_number, 63))];
+inline std::array<std::array<int, 64>, 64> build_lmr_table() {
+    std::array<std::array<int, 64>, 64> t{};
+    for (int d = 1; d < 64; ++d)
+        for (int m = 1; m < 64; ++m)
+            t[static_cast<std::size_t>(d)][static_cast<std::size_t>(m)] =
+                static_cast<int>(LmrBaseX100 / 100.0 + std::log(d) * std::log(m) / (LmrDivisorX100 / 100.0));
+    return t;
 }
+inline std::array<std::array<int, 64>, 64>& lmr_table() {
+    static std::array<std::array<int, 64>, 64> t = build_lmr_table();
+    return t;
+}
+inline int lmr_reduction(int depth, int move_number) {
+    return lmr_table()[static_cast<std::size_t>(std::min(depth, 63))][static_cast<std::size_t>(std::min(move_number, 63))];
+}
+// After a tuner changes parameters (SP_TUNE builds).
+inline void tune_apply() { lmr_table() = build_lmr_table(); }
 
 // One completed MultiPV line at some depth.
 struct Line {
@@ -774,7 +920,8 @@ private:
         const chess::Move se_excluded = se_excluded_[static_cast<std::size_t>(ply)];
         const bool se_search = se_excluded != chess::Move::NO_MOVE;
         TTEntry entry;
-        const bool tt_hit = tt_.probe(key, entry);
+        const bool tt_found = UseTtEval2 ? tt_.probe_any(key, entry) : tt_.probe(key, entry);
+        const bool tt_hit = tt_found && entry.bound != Bound::None;
         if (tt_hit) {
             tt_move = chess::Move(entry.move);
             if (!pv_node && !se_search && entry.depth >= depth) {
@@ -791,7 +938,14 @@ private:
         // positions (same pawns / same pieces).
         CorrKeys ck{};
         if (UseCorr) ck = corr_keys();
-        const Score raw_eval = in_check ? -Infinite : eval::evaluate(board_);
+        // The TT caches the eval before fifty-move scaling (the halfmove clock
+        // isn't part of the key); the scaling is reapplied here.
+        const int tt_store_eval = in_check ? TTNoEval
+                                  : (UseTtEval && tt_found && entry.eval != TTNoEval) ? entry.eval
+                                                                                   : eval::evaluate_unscaled(board_);
+        const Score raw_eval = in_check ? -Infinite : fifty(tt_store_eval);
+        if (UseTtEval2 && !tt_found && !in_check && !se_search)
+            tt_.store(key, chess::Move(chess::Move::NO_MOVE), 0, 0, Bound::None, tt_store_eval);
         const Score static_eval = (UseCorr && !in_check) ? corrected(raw_eval, ck) : raw_eval;
 
         // Improving: is our eval better than on our previous move (two plies
@@ -865,7 +1019,8 @@ private:
                         board_.unmakeMove(move);
                         if (stopped_) return 0;
                         if (score >= pc_beta) {
-                            tt_.store(key, move, score_to_tt(score, ply), depth - ProbCutReduction, Bound::Lower);
+                            tt_.store(key, move, score_to_tt(score, ply), depth - ProbCutReduction, Bound::Lower,
+                                      tt_store_eval);
                             return score;
                         }
                     }
@@ -881,14 +1036,24 @@ private:
         // probably badly ordered; search it one ply shallower.
         if (UseIir && (pv_node || cut_node) && depth >= IirDepth && tt_move == chess::Move::NO_MOVE) --depth;
 
+        // Staged: a legal TT move (not at the root, not in a singular
+        // verification search) is searched before the move list is built;
+        // the list is only generated if it doesn't cut off. The list order is
+        // the same either way (the TT move scores highest and comes first).
         OrderedMoves list;
-        chess::movegen::legalmoves(list.moves, board_);
-
-        if (list.moves.empty())
-            return board_.inCheck() ? -Mate + ply : 0;  // checkmate : stalemate
-        if (se_search && list.size() == 1) return alpha;  // only the excluded move: nothing to compare
-
-        score_moves(list, tt_move, ply);
+        const bool tt_first = UseStaged && ply > 0 && !se_search && is_legal_move(board_, tt_move);
+        bool generated = false;
+        auto generate = [&]() {
+            chess::movegen::legalmoves(list.moves, board_);
+            score_moves(list, tt_move, ply);
+            generated = true;
+        };
+        if (!tt_first) {
+            generate();
+            if (list.moves.empty())
+                return board_.inCheck() ? -Mate + ply : 0;  // checkmate : stalemate
+            if (se_search && list.size() == 1) return alpha;  // only the excluded move: nothing to compare
+        }
 
         Score best = -Infinite;
         chess::Move best_move(chess::Move::NO_MOVE);
@@ -901,8 +1066,18 @@ private:
         std::array<chess::Move, 32> captures_tried;
         int capture_count = 0;
 
-        for (int i = 0; i < list.size(); ++i) {
-            const chess::Move move = list.next(i);
+        for (int i = 0;; ++i) {
+            chess::Move move;
+            if (tt_first && i == 0) {
+                move = tt_move;
+            } else {
+                if (!generated) {
+                    generate();
+                    list.next(0);  // the TT move, already searched
+                }
+                if (i >= list.size()) break;
+                move = list.next(i);
+            }
             if (ply == 0 && !root_move_allowed(move)) continue;
             if (move == se_excluded) continue;
             const bool quiet = is_quiet(board_, move);
@@ -913,14 +1088,14 @@ private:
                 if (UseSingular && move == tt_move && !se_search && depth >= SingularMinDepth && tt_hit &&
                     entry.bound != Bound::Upper && entry.depth >= depth - 3 &&
                     !is_mate_score(score_from_tt(entry.score, ply))) {
-                    const Score s_beta = score_from_tt(entry.score, ply) - SingularMargin * depth;
+                    const Score s_beta = score_from_tt(entry.score, ply) - SingularMarginX8 * depth / 8;
                     se_excluded_[static_cast<std::size_t>(ply)] = move;
                     const Score s = pvs((depth - 1) / 2, ply, s_beta - 1, s_beta, false, cut_node);
                     se_excluded_[static_cast<std::size_t>(ply)] = chess::Move(chess::Move::NO_MOVE);
                     if (stopped_) return 0;
                     if (s < s_beta) {                    // only the TT move is good: search it deeper
                         extension = 1;
-                        if (UseSeDouble && !pv_node && s < s_beta - 20 && double_ext_[static_cast<std::size_t>(ply)] < 6) extension = 2;
+                        if (UseSeDouble && !pv_node && s < s_beta - DoubleExtMargin && double_ext_[static_cast<std::size_t>(ply)] < 6) extension = 2;
                     }
                     else if (s_beta >= beta) return s_beta;  // several moves beat beta: multi-cut
                     else if (UseSeNeg && (score_from_tt(entry.score, ply) >= beta || cut_node)) extension = -1;
@@ -945,17 +1120,20 @@ private:
             // SEE pruning of quiets, SEE pruning of captures.
             if (UseMovePruning && ply > 0 && !in_check && best > -(Mate - MaxPly) && move != tt_move &&
                 board_.hasNonPawnMaterial(board_.sideToMove())) {
-                const bool gc = gives_check(board_, move);
-                if (quiet && !gc) {
+                if (quiet) {
+                    // Checking quiets are never pruned; gives_check() is only
+                    // asked once a rule would prune the move.
                     const int lmr_d = std::max(0, depth - 1 - lmr_reduction(depth, moves_searched + 1));
-                    if (UseHistPrune && depth <= HistPruneDepth && move_hist < -HistPruneMul * depth) continue;
-                    if (UseFutPrune && lmr_d <= FutDepth && static_eval + FutBase + FutMul * lmr_d <= alpha) continue;
-                    if (UseSeePrune && !see_ge(board_, move, -SeeQuietMul * lmr_d * lmr_d)) continue;
-                } else if (!quiet && UseSeePrune && depth <= 8 && !see_ge(board_, move, -SeeCapMul * depth)) {
+                    const bool prune =
+                        (UseHistPrune && depth <= HistPruneDepth && move_hist < -HistPruneMul * depth) ||
+                        (UseFutPrune && lmr_d <= FutDepth && static_eval + FutBase + FutMul * lmr_d <= alpha) ||
+                        (UseSeePrune && !see_ge(board_, move, -SeeQuietMul * lmr_d * lmr_d));
+                    if (prune && !gives_check(board_, move)) continue;
+                } else if (UseSeePrune && depth <= 8 && !see_ge(board_, move, -SeeCapMul * depth)) {
                     continue;
                 }
             }
-            const bool bad_capture = !quiet && list.scores[static_cast<std::size_t>(i)] < 0;
+            const bool bad_capture = !quiet && generated && list.scores[static_cast<std::size_t>(i)] < 0;
             const bool refuter = quiet && (move == killers_[static_cast<std::size_t>(ply)][0] ||
                                            move == killers_[static_cast<std::size_t>(ply)][1]);
             make(move, ply);
@@ -1044,9 +1222,13 @@ private:
             const Bound bound = best >= beta        ? Bound::Lower
                               : best > alpha_orig   ? Bound::Exact
                                                     : Bound::Upper;
-            tt_.store(key, best_move, score_to_tt(best, ply), depth, bound);
+            tt_.store(key, best_move, score_to_tt(best, ply), depth, bound, tt_store_eval);
         }
         return best;
+    }
+
+    Score fifty(int unscaled) const {
+        return eval::fifty_move_scale(unscaled, static_cast<int>(board_.halfMoveClock()));
     }
 
     // Quiescence search: keep searching captures until the position is quiet,
@@ -1066,7 +1248,9 @@ private:
 
         // Any stored result (depth >= 0) is at least as good as a qsearch.
         TTEntry entry;
-        if (!pv_node && tt_.probe(key, entry)) {
+        const bool tt_found = (UseTtEval || !pv_node) && (UseTtEval2 ? tt_.probe_any(key, entry) : tt_.probe(key, entry));
+        const bool tt_hit = tt_found && entry.bound != Bound::None;
+        if (!pv_node && tt_hit) {
             const Score s = score_from_tt(entry.score, ply);
             if (entry.bound == Bound::Exact ||
                 (entry.bound == Bound::Lower && s >= beta) ||
@@ -1078,6 +1262,7 @@ private:
         OrderedMoves list;
         Score best;
         Score stand_pat = -Infinite;
+        int raw_eval = TTNoEval;  // raw static eval, cached in the TT (not in check)
 
         if (in_check) {
             // No standing pat in check: every evasion must be tried.
@@ -1087,13 +1272,29 @@ private:
         } else {
             // Stand pat: the side to move can usually do at least as well as
             // the static eval by making a quiet move.
-            best = stand_pat = UseCorr ? corrected(eval::evaluate(board_), corr_keys()) : eval::evaluate(board_);
-            if (best >= beta) {
-                tt_.store(key, chess::Move(chess::Move::NO_MOVE), score_to_tt(best, ply), 0,
-                          Bound::Lower);
-                return best;
+            const bool have_tt_eval = UseTtEval && tt_found && entry.eval != TTNoEval;
+            bool lazy_low = false;
+            if (UseLazy && !have_tt_eval && !is_mate_score(alpha) && !is_mate_score(beta)) {
+                // Lazy eval: if material + PST alone is far outside the window,
+                // the full eval (within LazyMargin of it) can't bring it back.
+                const Score fast = fifty(eval::fast_eval(board_));
+                if (fast - LazyMargin >= beta) return fast - LazyMargin;
+                if (fast + LazyMargin <= alpha) {
+                    best = stand_pat = fast + LazyMargin;  // an upper bound on stand pat
+                    lazy_low = true;
+                }
             }
-            alpha = std::max(alpha, best);
+            if (!lazy_low) {
+                raw_eval = have_tt_eval ? entry.eval : eval::evaluate_unscaled(board_);
+                const Score e = fifty(raw_eval);
+                best = stand_pat = UseCorr ? corrected(e, corr_keys()) : e;
+                if (best >= beta) {
+                    tt_.store(key, chess::Move(chess::Move::NO_MOVE), score_to_tt(best, ply), 0,
+                              Bound::Lower, raw_eval);
+                    return best;
+                }
+                alpha = std::max(alpha, best);
+            }
             chess::movegen::legalmoves<chess::movegen::MoveGenType::CAPTURE>(list.moves, board_);
         }
         score_moves(list, chess::Move(chess::Move::NO_MOVE), ply);
@@ -1136,7 +1337,7 @@ private:
         const Bound bound = best >= beta      ? Bound::Lower
                           : best > alpha_orig ? Bound::Exact
                                               : Bound::Upper;
-        tt_.store(key, best_move, score_to_tt(best, ply), 0, bound);
+        tt_.store(key, best_move, score_to_tt(best, ply), 0, bound, raw_eval);
         return best;
     }
 

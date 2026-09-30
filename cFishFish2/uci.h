@@ -563,7 +563,7 @@ inline SearchResult run_search(SearchContext& ctx) {
 // ---------------------------------------------------------------------------
 class Uci {
 public:
-    Uci() = default;
+    Uci() { eval::Kpk::get(); }  // build the KPK table now, not during the first search
     ~Uci() { stop_search(); }
     Uci(const Uci&) = delete;
     Uci& operator=(const Uci&) = delete;
@@ -616,6 +616,11 @@ private:
         send("option name Move Overhead type spin default 30 min 0 max 5000");
         send("option name Ponder type check default false");
         send("option name OwnBook type check default true");
+        send("option name BookMode type combo default ", book::ModeNames[BOOK_MODE],
+             " var Wide var Normal var Tight var Optimal");
+        if (SP_TUNE)
+            for (const auto& t : search::tune_params())
+                send("option name ", t.name, " type spin default ", t.def, " min ", t.min, " max ", t.max);
         send("uciok");
     }
 
@@ -663,7 +668,28 @@ private:
         else if (key == "move overhead") spin(options_.move_overhead, 0, 5000);
         else if (key == "ponder")        options_.ponder = (to_lower(value) == "true");
         else if (key == "ownbook")       options_.own_book = (to_lower(value) == "true");
+        else if (key == "bookmode") {
+            bool found = false;
+            for (int i = 0; i < 4; ++i)
+                if (to_lower(value) == to_lower(book::ModeNames[i])) {
+                    book::Book::instance().set_mode(static_cast<book::Mode>(i));
+                    found = true;
+                }
+            if (!found) send("info string unknown BookMode: ", value);
+        }
+        else if (SP_TUNE && set_tune_param(key, value)) {}
         else send("info string unknown option: ", name);
+    }
+
+    // SP_TUNE builds: search parameters as spin options (names case-insensitive).
+    bool set_tune_param(const std::string& key, const std::string& value) {
+        for (auto& t : search::tune_params())
+            if (to_lower(t.name) == key) {
+                *t.value = std::clamp(std::atoi(value.c_str()), t.min, t.max);
+                search::tune_apply();
+                return true;
+            }
+        return false;
     }
 
     // ---- position [startpos | fen <fen>] [moves <m1> ... <mN>] ------------
@@ -765,11 +791,15 @@ private:
         // mate) where the GUI wants the engine's own evaluation.
         if (options_.own_book && !lim.infinite && !lim.ponder && lim.searchmoves.empty() &&
             lim.mate == 0) {
-            const chess::Move m = book::Book::instance().probe(position_.board);
+            auto& bk = book::Book::instance();
+            const chess::Move m = bk.probe(position_.board);
             if (m != chess::Move::NO_MOVE) {
                 const std::string uci = chess::uci::moveToUci(m, position_.board.chess960());
-                send("info string book move ", uci);
-                send("info depth 0 score cp 0 nodes 0 time 0 pv ", uci);
+                int cp = 0;  // cached build-time score, side to move's view
+                for (const auto& c : bk.moves(position_.board))
+                    if (c.move == m) cp = position_.board.sideToMove() == chess::Color::WHITE ? c.score : -c.score;
+                send("info string book move ", uci, " (", book::ModeNames[static_cast<int>(bk.mode())], ")");
+                send("info depth 0 score cp ", cp, " nodes 0 time 0 pv ", uci);
                 send("bestmove ", uci);
                 return;
             }
@@ -778,19 +808,23 @@ private:
         start_search(std::move(lim));
     }
 
-    // "book": book moves for the current position with their weights.
+    // "book": book moves for the current position with their weights and
+    // cached scores; "*" marks moves the current BookMode may play.
     void cmd_book() {
-        const auto moves = book::Book::instance().moves(position_.board);
+        auto& bk = book::Book::instance();
+        const auto moves = bk.moves(position_.board);
+        const auto ok = bk.playable(position_.board, bk.mode());
         if (moves.empty()) {
             send("info string out of book (", book::Book::instance().positions(), " book positions)");
             return;
         }
-        int total = 0;
-        for (const auto& m : moves) total += m.weight;
         for (const auto& m : moves)
             send("info string book ", chess::uci::moveToSan(position_.board, m.move), " (",
                  chess::uci::moveToUci(m.move, position_.board.chess960()), ")  weight ", m.weight,
-                 "  ", m.weight * 100 / total, "%");
+                 m.wide_weight ? "  wide " + std::to_string(m.wide_weight) : std::string(),
+                 "  score ", m.score, " (white)",
+                 std::any_of(ok.begin(), ok.end(), [&](const book::BookMove& c) { return c.move == m.move; }) ? "  *" : "");
+        send("info string BookMode ", book::ModeNames[static_cast<int>(bk.mode())]);
     }
 
     // "go perft N": per-move counts, then the total (same format as Stockfish).
