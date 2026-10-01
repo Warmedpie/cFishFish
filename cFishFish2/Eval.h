@@ -88,10 +88,10 @@ struct MobilityWeight {
     Score mg, eg;
     int base;
 };
-inline constexpr MobilityWeight KnightMobility = {9, -1, 4};
-inline constexpr MobilityWeight BishopMobility = {9, 3, 7};
-inline constexpr MobilityWeight RookMobility = {3, 8, 7};
-inline constexpr MobilityWeight QueenMobility = {3, 7, 14};
+inline constexpr MobilityWeight KnightMobility = {8, 11, 4};
+inline constexpr MobilityWeight BishopMobility = {5, -1, 7};
+inline constexpr MobilityWeight RookMobility = {3, 9, 7};
+inline constexpr MobilityWeight QueenMobility = {6, -3, 14};
 
 // ---------------------------------------------------------------------------
 // Piece-square tables, from WHITE's point of view.
@@ -123,60 +123,60 @@ inline constexpr Score PstScaleDenEG = 1;
 inline constexpr Table PawnMG = {
        0,   0,   0,   0,   0,   0,   0,   0,   // rank 8
       -3,   3,  -1,  -5,   2,  -7,   4,  -3,   // rank 7
-     -27, -11,  14,  -1,  16,   8, -11,  21,   // rank 6
-     -25, -26, -27, -20, -21, -21, -25, -27,   // rank 5
-     -36, -41, -19, -17, -15, -17, -38, -36,   // rank 4
-     -28, -25, -13, -21, -13, -11,  -4, -25,   // rank 3
-     -33, -17, -11, -17, -13,   0,   1, -31,   // rank 2
+     -23, -27, -17, -32, -25, -19, -48, -13,   // rank 6
+     -32, -35, -34, -42, -35, -33, -43, -31,   // rank 5
+     -38, -48, -30, -29, -30, -28, -49, -47,   // rank 4
+     -34, -33, -26, -33, -21, -19, -13, -36,   // rank 3
+     -38, -24, -25, -32, -28, -14,  -7, -44,   // rank 2
        0,   0,   0,   0,   0,   0,   0,   0,   // rank 1
 };
 
 // Knights, opening / middlegame
 inline constexpr Table KnightMG = {
      -83, -34, -23, -11, -11, -23, -34, -83,   // rank 8
-     -28, -11, -11,  15,  15,   2, -11, -28,   // rank 7
-      -4,   9,  32,  11,  37,  24,  29,  -4,   // rank 6
-     -14,  13,  12,  31,  31,  39,  20,   8,   // rank 5
-      -3,  26,  16,   6,   7,  28,  20,  17,   // rank 4
-     -19, -18, -13,   0, -12, -10, -10, -13,   // rank 3
-     -32, -17, -27, -21, -13, -22, -17, -32,   // rank 2
-     -72, -24, -31, -30,   3, -31, -23, -72,   // rank 1
+     -28, -11,  11,  15,  15,   2, -11, -28,   // rank 7
+      -4,  22,  16,  33,  36,  25,  34,  -4,   // rank 6
+       4,  18,  23,  40,  28,  35,  21,  24,   // rank 5
+      10,  12,  22,  12,  16,  32,  14,  13,   // rank 4
+     -16, -10,  -9,   3,  -1,  -6,  -1, -19,   // rank 3
+     -32, -17, -21, -14, -14, -20,  -1, -15,   // rank 2
+     -72, -15, -31, -16,  -1, -28, -18, -72,   // rank 1
 };
 
 // Bishops, opening / middlegame
 inline constexpr Table BishopMG = {
      -20,   0,  -6,  -9,  -9,  -6,   0, -20,   // rank 8
-      -7,  -6,   5,   0,   0,   2,  -6,  -7,   // rank 7
-     -27,   2,  -5,  12,   5,   0,  -3, -16,   // rank 6
-     -14,  15,  16,  72,  30,  22,  11, -33,   // rank 5
-      -2,  -3,  15,  -1,  31,  10,  -8,  -2,   // rank 4
-       8,  31, -21,   5,  -9,   8,   1,  -9,   // rank 3
-      -6,  -1,  18, -14,  -1,  18,  -9,  -6,   // rank 2
-     -22,  -2,  -6, -43,  23, -21,  -2, -22,   // rank 1
+      -7, -12, -13,   0,   0,   2,  -6,  -7,   // rank 7
+      -2,  14,  -1,  24,  26, -13,  -3,   5,   // rank 6
+       4,  17,  19,  47,  21,  16,  16,  -4,   // rank 5
+       8,   8,  17,  17,  25,  12,  -6,   6,   // rank 4
+      18,  23,  -9,   3,  -2,  -2,   7,   1,   // rank 3
+      -2,   5,  10, -14,  -8,   2,   1,  -6,   // rank 2
+     -22,  -2, -10, -10,   0, -22,  -2, -11,   // rank 1
 };
 
 // Rooks, opening / middlegame
 inline constexpr Table RookMG = {
       -7,  -8,   0,   4,   4,   0,  -8,  -7,   // rank 8
-      -1, -16,   6,   7,   7,   7,   5,  -8,   // rank 7
-     -26,  -1,   2,   5,   5,   2,  -1,  -9,   // rank 6
-     -14,   2,  -7,   3,   1,  -2, -32, -28,   // rank 5
-     -22,   6, -25, -23,  10,   2, -14, -11,   // rank 4
-     -36, -16, -20,  -4, -25, -20, -31, -33,   // rank 3
-     -35, -11, -20, -12, -10,   0, -13, -35,   // rank 2
-     -24, -23, -12,  -9,   0,  -4, -15, -14,   // rank 1
+       3, -13,   5,  31,   0,   7,   5,  -8,   // rank 7
+     -40, -28,  -4,   1,  -9,   2,  -1,  -9,   // rank 6
+     -36,  -8, -29, -24, -26, -14, -32, -25,   // rank 5
+     -35, -29, -34, -36, -15,  -8,  -9, -27,   // rank 4
+     -38, -30, -35, -27, -33, -14, -29, -39,   // rank 3
+     -36, -20, -24, -26, -21, -14, -19, -52,   // rank 2
+     -31, -27, -23, -17,  -8, -11, -28, -20,   // rank 1
 };
 
 // Queens, opening / middlegame
 inline constexpr Table QueenMG = {
       -1,  -1,   0,  -1,  -1,   0,  -1,  -1,   // rank 8
-     -26,  -7,   4,   3,   3,   4,   2,  -2,   // rank 7
-       5,   4,  15,   3,   3,   2,  22,  21,   // rank 6
-      -6, -18,  15,   3,  20,  15,  11,   3,   // rank 5
-       8, -12, -11,  -6,   0,   3,   6, -37,   // rank 4
-      -3,   6, -12,  -5,  -5,   2,  14,  -7,   // rank 3
-      -9,  -4,   4,  10,   1,  12,  31,  -1,   // rank 2
-     -16, -34, -11,   0,   9, -25,  -2,   1,   // rank 1
+     -51, -23,  -7,   3,   3,  -6,   2,  12,   // rank 7
+      -3,   1,  -6,  14,  10,  10, -10,   1,   // rank 6
+     -15,  -9, -15, -24, -31,   0, -17,   1,   // rank 5
+      -2, -21, -11, -19,  -9,  -8,  -1, -17,   // rank 4
+     -15,  -2, -19, -14, -13,  -8,   1, -13,   // rank 3
+     -22, -15,  -8,  -8, -10,   3,   7,  -1,   // rank 2
+     -13, -21, -16, -15, -11, -31,  -2,   1,   // rank 1
 };
 
 // King, opening / middlegame
@@ -186,82 +186,82 @@ inline constexpr Table KingMG = {
       51,  60,  33,  13,  13,  33,  60,  51,   // rank 6
       63,  74,  43,  29,  29,  43,  74,  63,   // rank 5
       68,  78,  57,  40,  40,  57,  78,  68,   // rank 4
-      80,  86,  29,  34,  29,  61,  83,  76,   // rank 3
-     115, 106,  92, 117,  99, 137, 170, 128,   // rank 2
-     112, 186, 174, 126, 139, 136, 186, 187,   // rank 1
+      80,  86,  29,  27,  33,  62,  96,  96,   // rank 3
+     115, 165, 141, 139, 117, 159, 198, 198,   // rank 2
+     112, 212, 197, 162, 167, 169, 215, 217,   // rank 1
 };
 
 // ---- Endgame ---------------------------------------------------------------
 // Pawns, endgame
 inline constexpr Table PawnEG = {
        0,   0,   0,   0,   0,   0,   0,   0,   // rank 8
-     -38, -24, -13,  15, -20,  -6,  -7, -17,   // rank 7
-      17,  21,   6,  15,  10,  22,  25,   7,   // rank 6
-       7,   9,   2,  -1,   1,   4,   6,   1,   // rank 5
-       4,   4,  -2,  -4,   1,  -3,   3,  -2,   // rank 4
-      -4,  -3,  -3,  -4,   0,   3,  -7,  -5,   // rank 3
-       0,  -6,  -2,   5,   5,   5,  -2,  -8,   // rank 2
+     -27,  -8,  15,  10,  -7,   7, -15, -29,   // rank 7
+      22,  24,  20,  24,  27,  25,  36,  22,   // rank 6
+      15,  17,  11,  14,  12,  16,  18,  11,   // rank 5
+       7,  13,   8,   9,  11,   8,   9,   4,   // rank 4
+       2,   4,  11,  10,  14,  14,   2,   4,   // rank 3
+       5,   1,   8,  21,  18,  18,   5,   1,   // rank 2
        0,   0,   0,   0,   0,   0,   0,   0,   // rank 1
 };
 
 // Knights, endgame
 inline constexpr Table KnightEG = {
-     -35, -31, -19,  -6,  -6, -19, -31, -35,   // rank 8
-     -24, -20, -33, -11,   7, -26, -17, -24,   // rank 7
-     -18, -11, -11,  -5,   2,  -6,   1, -18,   // rank 6
-      -1,  -6,  -1,   0,   7,  -3,   0,  -7,   // rank 5
-      -7, -14,   2,   2,  10,   0,   3,  -2,   // rank 4
-     -81, -12, -16, -12,  -5, -21, -19, -53,   // rank 3
-     -23, -19, -29,  -6, -17, -16, -19, -23,   // rank 2
-     -33, -57, -22,  -6, -26, -22, -38, -33,   // rank 1
+     -35, -31, -23,   9,  -6, -19, -31, -35,   // rank 8
+     -19,  -7,   3,   6,   8,  -4,  -8, -12,   // rank 7
+      -2,  -6,   0,   7,   3,   0,  -2, -17,   // rank 6
+      -3,  -1,   1,  12,  12,   4,  -2, -15,   // rank 5
+      -2,   0,   3,   8,  11,   1,   3,  -4,   // rank 4
+     -32,  -7, -10, -11,  -2, -17, -19, -31,   // rank 3
+     -23, -11, -24,  -6, -19, -18, -31, -19,   // rank 2
+     -33, -34, -21,  -7, -21, -25, -32, -33,   // rank 1
 };
 
 // Bishops, endgame
 inline constexpr Table BishopEG = {
-     -16, -15, -10, -11,  10, -14, -15, -16,   // rank 8
-     -21,  -7,  -5,   7,  10,  -4,   6,   3,   // rank 7
-      -9,  17,  -6,   5,   0,  10,   1,  -6,   // rank 6
-      -6,   0,   9,   1,   6,  -1,   9,   3,   // rank 5
-       9,  -6,   6,  10,   3,   6,   3, -19,   // rank 4
-      -4,  -5,  -4,   3,   6, -18, -13,   0,   // rank 3
-     -13, -15, -11,  -2,  -5, -24, -19, -13,   // rank 2
-       5, -18,  -5, -19,  -9,  -7,  -8,  -8,   // rank 1
+      -8,   7,   4,   8,  10,   9, -15, -16,   // rank 8
+       1,  -3,  14,  11,   6,   7,   5,  -8,   // rank 7
+      10,  24,   2,  20,  11,  19,  14,   0,   // rank 6
+       7,  16,  15,  20,  25,  20,  13,   1,   // rank 5
+      18,  14,  15,  24,  18,  20,   4,   3,   // rank 4
+      -5,  15,   3,  10,  16, -14,   6,   0,   // rank 3
+      -1, -14,  -3,   7,  -1,  -2, -18,   0,   // rank 2
+       0,  -7,  -3,  -1,  -1,  -1, -11, -23,   // rank 1
 };
 
 // Rooks, endgame
 inline constexpr Table RookEG = {
-     -12,  -4,  -1,  -1,  -5,  -6,   0,  -1,   // rank 8
-     -15, -11, -20, -11, -24, -10, -13, -14,   // rank 7
-      -5, -15, -18,  -9, -13, -11, -12, -20,   // rank 6
-      -3, -11, -13, -19, -18, -16, -17, -10,   // rank 5
-     -11, -15, -13, -14, -22, -27, -21, -24,   // rank 4
-     -17, -38, -17, -33, -24, -31, -30, -20,   // rank 3
-     -25, -38, -30, -39, -38, -35, -42, -38,   // rank 2
-     -32, -36, -28, -34, -40, -40, -38, -39,   // rank 1
+      23,  24,  22,  23,  19,  28,  28,  23,   // rank 8
+      17,  16,  15,  15,   8,  18,  16,  17,   // rank 7
+      26,  22,  15,  16,  15,  20,  19,  12,   // rank 6
+      22,  21,  18,  14,   8,  10,  13,  10,   // rank 5
+      16,  14,  14,  11,  -1,   1,   5,   0,   // rank 4
+       5,   5,   1,  -1,  -4,  -2,  -8,   1,   // rank 3
+      -1,  -9,  -7,  -9, -11, -13, -19, -18,   // rank 2
+      -8, -13,  -8, -11, -18, -16, -14, -21,   // rank 1
 };
 
 // Queens, endgame
 inline constexpr Table QueenEG = {
-     -35, -14, -15, -12, -12, -15, -18, -33,   // rank 8
-      -5, -15,   4,  12,  -3,  -8,  -9, -17,   // rank 7
-     -13,  -3,  -3,  -1,  27,  38,   3, -13,   // rank 6
-     -33,   0,  12,  20, -10,  17,  33,  39,   // rank 5
-     -10,  -5,  11,   7,  16,  15,  19,  -1,   // rank 4
-     -14,  10, -16,  21,   7,   1, -17, -14,   // rank 3
-     -19, -16, -20, -62,  -9, -39, -24, -19,   // rank 2
-     -24, -20, -22, -40, -36, -16, -20, -24,   // rank 1
+      69,  59,  78,  99,  87,  84, 103,  86,   // rank 8
+      85,  80,  84,  87,  83,  73,  67,  63,   // rank 7
+      52,  88,  75,  93,  89,  81,  93,  58,   // rank 6
+      53,  66,  86, 101,  92,  80,  75,  52,   // rank 5
+      30,  75,  56,  76,  64,  60,  52,  34,   // rank 4
+      40,  36,  64,  50,  48,  52,  29,  51,   // rank 3
+     -19,  33,  18,  24,  26,   0, -12, -19,   // rank 2
+     -24, -20,  18,  10,  -2, -21, -20, -24,   // rank 1
 };
 
 // King, endgame
 inline constexpr Table KingEG = {
-       4,  48,  25,  27,  27,  25,  43,   4,   // rank 8
-      38,  55,  53,  48,  87,  40,  52,  31,   // rank 7
-      50,  71,  68,  78,  74,  80,  79,  37,   // rank 6
-      47,  65,  72,  79,  76,  79,  64,  15,   // rank 5
-      40,  56,  62,  69,  68,  68,  51,  34,   // rank 4
-      11,  42,  53,  58,  60,  56,  47,  33,   // rank 3
-      49,  55,  51,  48,  48,  47,  40,  38,   // rank 2
-      27,  21,  28,  13,  23,  29,  22,   3,   // rank 1
+       4,  49,  38,  35,  64,  48,  48,   4,   // rank 8
+      39,  88,  89,  84,  87,  88,  85,  35,   // rank 7
+      90, 105, 105, 106, 110, 108, 112,  77,   // rank 6
+      74,  90,  98, 102,  98,  99,  91,  64,   // rank 5
+      54,  72,  84,  87,  83,  84,  70,  62,   // rank 4
+      46,  59,  71,  75,  76,  71,  64,  50,   // rank 3
+      53,  58,  64,  63,  66,  61,  56,  46,   // rank 2
+      40,  39,  42,  31,  35,  44,  36,  20,   // rank 1
 };
 // clang-format on
 
@@ -734,19 +734,19 @@ inline constexpr bool EvalUseImbalance     = EV_IMBALANCE;      // knight / rook
 // Passed pawns, by relative rank (rank 2 = index 1 ... rank 7 = index 6).
 // Started from the author's earlier engine, then tuned. They overlap with the
 // pawn PSTs (both reward advanced pawns), so only their sum is meaningful.
-inline constexpr Score PassedMG[8] = {0, 7, -5, 11, 27, 31, 145, 0};
-inline constexpr Score PassedEG[8] = {0, 16, 9, 11, 26, 42, 79, 0};
-inline constexpr MgEg PassedProtected = {18, 9};   // defended by own pawn
-inline constexpr MgEg PassedBlocked = {-6, 1}; // stop square occupied
-inline constexpr Score PassedFreePathEG[8] = {0, -7, -3, 3, 11, 26, 77, 0};
+inline constexpr Score PassedMG[8] = {0, 1, -16, -1, 14, 32, 55, 0};
+inline constexpr Score PassedEG[8] = {0, 21, 16, 25, 37, 58, 110, 0};
+inline constexpr MgEg PassedProtected = {22, 10};   // defended by own pawn
+inline constexpr MgEg PassedBlocked = {-6, -3}; // stop square occupied
+inline constexpr Score PassedFreePathEG[8] = {0, -2, 0, 1, 12, 25, 77, 0};
 inline constexpr Score PassedKingDistEG = 4;           // x (rank-2) x (2*their king dist - our king dist)
-inline constexpr MgEg RookBehindPasser = {-4, 25};
+inline constexpr MgEg RookBehindPasser = {4, 21};
 
 // King safety (EV_KDANGER2 off): attack units -> penalty (mg), when the attacker has a queen (rules: EV_KS_*).
 inline constexpr int KingAttackWeight[6] = {0, 2, 2, 3, 5, 0};  // per attacked zone square
 inline constexpr Score KingDangerScale = 75;  // % applied to SafetyTable (tuner slot)
 inline constexpr int SafeCheckUnits[6]   = {0, 3, 2, 4, 6, 0};  // N, B, R, Q safe check available
-inline constexpr Score ShieldRank3 = -9, ShieldMissing = -22, ShieldOpenFile = -20;  // mg, per file
+inline constexpr Score ShieldRank3 = -10, ShieldMissing = -24, ShieldOpenFile = -15;  // mg, per file
 // Classic attack-unit table (chessprogramming.org "King Safety").
 inline constexpr Score SafetyTable[64] = {
       0,   0,   1,   2,   3,   5,   7,   9,  12,  15,  18,  22,  26,  30,  35,  39,
@@ -756,28 +756,28 @@ inline constexpr Score SafetyTable[64] = {
 };
 
 // Pawn structure (per pawn).
-inline constexpr MgEg IsolatedPawn = {-12, -12};
-inline constexpr MgEg DoubledPawn = {-4, -14};
-inline constexpr MgEg BackwardPawn = {-9, -9};
+inline constexpr MgEg IsolatedPawn = {-11, -15};
+inline constexpr MgEg DoubledPawn = {-2, -10};
+inline constexpr MgEg BackwardPawn = {-8, -10};
 
 // Outposts (protected by own pawn, can never be attacked by an enemy pawn).
 inline constexpr MgEg KnightOutpost = {25, 15};
 inline constexpr MgEg BishopOutpost = {12, 6};
 
 // Bishops.
-inline constexpr MgEg BishopPair = {46, 37};
-inline constexpr MgEg BadBishopPerPawn = {2, -3};  // own pawns on the bishop's colour
+inline constexpr MgEg BishopPair = {33, 44};
+inline constexpr MgEg BadBishopPerPawn = {-1, -3};  // own pawns on the bishop's colour
 
 // Rooks.
-inline constexpr MgEg RookOpenFile = {37, 1};
-inline constexpr MgEg RookSemiOpenFile = {14, 11};
-inline constexpr MgEg RookOnSeventh = {-8, 10};
+inline constexpr MgEg RookOpenFile = {36, 4};
+inline constexpr MgEg RookSemiOpenFile = {17, 8};
+inline constexpr MgEg RookOnSeventh = {-16, 7};
 
 // Threats (bonus for the attacking side).
-inline constexpr MgEg ThreatByPawn = {11, 62};  // pawn attacks a piece
-inline constexpr MgEg ThreatByMinor = {46, 21};  // knight/bishop attacks rook/queen
-inline constexpr MgEg ThreatByRook = {35, 20};  // rook attacks queen
-inline constexpr MgEg HangingPiece = {12, 22};  // attacked and undefended
+inline constexpr MgEg ThreatByPawn = {29, 77};  // pawn attacks a piece
+inline constexpr MgEg ThreatByMinor = {45, 26};  // knight/bishop attacks rook/queen
+inline constexpr MgEg ThreatByRook = {46, 5};  // rook attacks queen
+inline constexpr MgEg HangingPiece = {13, 14};  // attacked and undefended
 
 // Endgame terms. Hand-set, then Texel-tuned with every older weight frozen
 // (tools/tuner ... only_new=1).
@@ -787,22 +787,22 @@ inline constexpr Score CandidateEG[8] = {0, 5, 6, 11, 16, 26, 0, 0};  // by rela
 #ifndef EV_PAWN_THREATS_MG
 #define EV_PAWN_THREATS_MG 8
 #endif
-inline constexpr MgEg ThreatOnPawn = {17, 29};        // minor / rook attacks an undefended pawn
-inline constexpr Score KingThreatOnPawnEG = 51;     // king attacks an undefended pawn
+inline constexpr MgEg ThreatOnPawn = {17, 27};        // minor / rook attacks an undefended pawn
+inline constexpr Score KingThreatOnPawnEG = 53;     // king attacks an undefended pawn
 inline constexpr MgEg RookBehindEnemyPasser = {0, 18};
 inline constexpr MgEg RookInFrontOfEnemyPasser = {0, -8};
 
 // Second-round terms (starting values; tuned on Stockfish labels).
-inline constexpr MgEg ThreatOnWeakPawn = {0, 8};     // minor / rook attacks a pawn not defended by a pawn
-inline constexpr MgEg BadBishopFixedPawn = {-8, -6}; // per own pawn on the bishop's colour that can't advance
-inline constexpr MgEg KnightPerPawn = {6, 4};          // per knight, per own pawn above 5 (knights like closed positions)
-inline constexpr MgEg RookPerPawn = {5, -6};          // per rook, per own pawn above 5 (rooks like open ones)
+inline constexpr MgEg ThreatOnWeakPawn = {0, 9};     // minor / rook attacks a pawn not defended by a pawn
+inline constexpr MgEg BadBishopFixedPawn = {-4, -7}; // per own pawn on the bishop's colour that can't advance
+inline constexpr MgEg KnightPerPawn = {3, 3};          // per knight, per own pawn above 5 (knights like closed positions)
+inline constexpr MgEg RookPerPawn = {11, -10};          // per rook, per own pawn above 5 (rooks like open ones)
 
 // King danger formula (EV_KDANGER2), for one king. danger = sum of
 // KdWeight[i] * signal i (signals: KdFeature below); penalty = danger^2 / 1024
 // in the middlegame and danger * KdEgSlope / 64 in the endgame, when danger > 0.
-inline constexpr int KdWeight[18] = {25, 0, 2, -3, 21, 15, 152, 78, 167, 139, 31, 6, -14, 59, -49, -201, 198, 0};
-inline constexpr int KdEgSlope = 9;
+inline constexpr int KdWeight[18] = {27, 3, 7, -12, 16, 14, 142, 96, 183, 147, 27, 9, -17, 64, -37, -159, 194, 0};
+inline constexpr int KdEgSlope = 8;
 
 // Pawn shelter / storm (EV_SHELTER), mg, per file of the three in front of
 // the king. Index [d][r]: d = file distance from the board edge (0-3),
@@ -825,7 +825,7 @@ inline constexpr int InitWeight[8] = {10, 10, 20, 8, 10, 40, -40, -100};
 //   [3] + [4] * passed pawns (bishops of opposite colour only)
 //   [5] + [6] * minors facing a lone queen      [7] no pawns, <= a minor ahead
 //   [8] KRKP drawish      [9] KQKP drawish (7th-rank a/c/f/h pawn)
-inline constexpr int ScaleParam[10] = {39, 6, 4, 6, 7, 57, 20, 3, 5, 4};
+inline constexpr int ScaleParam[10] = {24, 12, 8, 6, 8, 57, 20, 5, 7, 5};
 
 // Connected pawns (EV_CONNECTED), by the pawn's relative rank.
 inline constexpr Score PhalanxMG[8] = {0, 2, 5, 8, 15, 30, 50, 0};    // own pawn beside it
@@ -841,24 +841,24 @@ inline constexpr MgEg WeakLever = {-5, -40};        // attacked by two enemy paw
 // a pawn; rook hits one; our safe pawns hit a piece; a safe pawn push would
 // hit a piece; our knight can reach a safe square hitting the queen; a
 // bishop / rook likewise (square attacked twice by us); restricted squares.
-inline constexpr MgEg Threats2W[7] = {{24, 24}, {17, 28}, {56, -19}, {22, 13}, {9, -10}, {19, -6}, {5, 0}};
+inline constexpr MgEg Threats2W[7] = {{19, 26}, {19, 28}, {34, -37}, {19, 16}, {7, -3}, {14, 1}, {5, 2}};
 // EV_PIECES2, by pieces2() signal: minor with a pawn right in front; bishop
 // seeing two centre squares through pawns; knight / bishop distance to own
 // king (per square); trapped rook; trapped rook without castling rights (extra);
 // rook on a file with a queen; our queen pinned / exposed to a discovered attack.
-inline constexpr MgEg Pieces2W[8] = {{4, 10}, {22, 10}, {-4, -1}, {-4, -1}, {7, 13}, {-28, -27}, {7, 6}, {-19, 32}};
+inline constexpr MgEg Pieces2W[8] = {{4, 10}, {20, 17}, {-4, -3}, {-4, -1}, {11, 2}, {-43, -16}, {7, 10}, {-18, 28}};
 // EV_IMBALANCE2: counts (0 bishop pair, 1 P, 2 N, 3 B, 4 R, 5 Q); weights for
 // own_i * own_j (j <= i, 21) then own_i * theirs_j (j < i, 15).
 inline constexpr MgEg Imbalance2W[36] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}};
 // EV_MOBILITY2: extra bonus by number of mobility-area squares: N 0-8, B 0-13,
 // R 0-14, Q 0-27 (index offsets 0, 9, 23, 38).
-inline constexpr MgEg MobExtra[66] = {{0, 0}, {16, 0}, {20, 38}, {21, 52}, {24, 55}, {25, 58}, {21, 62}, {15, 67}, {8, 67}, {18, 0}, {25, 20}, {32, 35}, {33, 50}, {33, 58}, {32, 59}, {23, 61}, {20, 61}, {13, 59}, {3, 57}, {0, 50}, {0, 51}, {0, 54}, {0, 54}, {0, 0}, {-56, 2}, {-44, 48}, {-39, 55}, {-33, 53}, {-28, 51}, {-26, 56}, {-22, 46}, {-19, 40}, {-20, 41}, {-17, 35}, {-21, 31}, {-24, 28}, {-30, 26}, {0, 19}, {0, 0}, {0, 0}, {4, 0}, {1, 0}, {3, 0}, {10, 0}, {12, 0}, {15, 0}, {14, 54}, {18, 46}, {16, 59}, {17, 65}, {17, 65}, {16, 74}, {8, 69}, {11, 77}, {5, 82}, {-2, 72}, {0, 74}, {0, 63}, {0, 75}, {0, 60}, {0, 0}, {0, 65}, {0, 0}, {0, 98}, {0, 0}, {0, 0}};
+inline constexpr MgEg MobExtra[66] = {{-18, 0}, {0, 77}, {7, 105}, {9, 109}, {10, 103}, {9, 96}, {4, 88}, {-1, 79}, {-9, 67}, {-5, 13}, {6, 43}, {18, 64}, {17, 77}, {18, 88}, {16, 92}, {14, 95}, {10, 98}, {5, 101}, {-1, 101}, {0, 98}, {-10, 100}, {0, 100}, {0, 102}, {0, 0}, {-58, 82}, {-45, 114}, {-42, 114}, {-38, 107}, {-37, 103}, {-37, 101}, {-36, 92}, {-35, 85}, {-37, 82}, {-37, 74}, {-44, 69}, {-43, 61}, {-48, 56}, {-48, 48}, {0, 0}, {0, 0}, {17, 0}, {16, 0}, {23, 0}, {26, 0}, {20, 98}, {16, 111}, {14, 127}, {12, 139}, {8, 150}, {3, 161}, {-2, 171}, {-6, 177}, {-17, 182}, {-14, 182}, {-22, 192}, {-29, 195}, {-33, 198}, {-36, 199}, {-27, 199}, {0, 171}, {0, 177}, {0, 164}, {0, 181}, {0, 145}, {0, 0}, {0, 137}};
 // EV_PASSED2 (per passed pawn, relative rank index): path to promotion not
 // attacked or occupied by the enemy [0-7]; else stop square safe [8-15]; every
 // path square defended by us [16-23]; per file of distance from the edge [24].
-inline constexpr MgEg Passed2W[25] = {{0, 0}, {0, 0}, {0, 0}, {0, 12}, {0, 30}, {0, 50}, {0, 70}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {-10, 1}, {0, 5}, {0, 21}, {0, 20}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 5}, {0, 8}, {0, 55}, {0, 77}, {0, 0}, {-13, -2}};
+inline constexpr MgEg Passed2W[25] = {{0, 0}, {0, 0}, {0, 0}, {0, 15}, {0, 28}, {0, 53}, {0, 70}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {-1, 1}, {5, 5}, {24, 16}, {0, 20}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 10}, {0, 50}, {0, 64}, {0, 89}, {0, 0}, {-5, -5}};
 
-inline constexpr Score Tempo = 26;       // side to move
+inline constexpr Score Tempo = 18;       // side to move
 inline constexpr Score SpacePerSquare = 4;  // mg
 
 // ---- Bitboard helpers (a1 = bit 0, h8 = bit 63) -----------------------------

@@ -47,6 +47,11 @@ using eval::Mate;
 // 2000 -> 1797; history-LMR divisor 4096 -> 4403. The values below are the
 // tuned ones. A/B vs. the untuned engine: 800 games @25 ms +307 -218 =275
 // (~+39), 600 games @100 ms +191 -137 =272 (~+31, LOS 99.8%).     ADOPTED
+// SPSA round 2 (after the self-play eval re-tune), same setup, openings from
+// tools/openings.h: LMR base 0.84 -> 0.90, divisor 2.04 -> 1.89; RFP margin
+// 72 -> 68; LMP scale 2.02 -> 2.13; singular min depth 8 -> 7; IIR depth
+// 6 -> 5; futility base 99 -> 95. A/B vs. round 1 values: 600 games @25 ms
+// +206 -148 =246 (~+34), 600 @100 ms +176 -133 =291 (~+25, LOS 99%).  ADOPTED
 #ifndef SP_TUNE
 #define SP_TUNE 0
 #endif
@@ -381,7 +386,7 @@ struct OrderedMoves {
 // Reverse futility pruning: at depth <= RfpMaxDepth, a non-PV node whose
 // static eval beats beta by RfpMargin per ply of depth is cut off.
 SP_PARAM(RfpMaxDepth, 8, 4, 12)
-SP_PARAM(RfpMargin, 72, 30, 160)
+SP_PARAM(RfpMargin, 68, 30, 160)
 
 // Null-move pruning: from this depth, reduction R = NmpBase + depth / NmpDiv.
 SP_PARAM(NmpMinDepth, 2, 1, 6)
@@ -444,7 +449,7 @@ inline constexpr bool LmpKeepChecks   = SR_LMP_KEEP_CHECKS;  // LMP never skips 
 #define SR_LMP_SCALE 2
 #endif
 SP_PARAM(LmpMaxDepth, SR_LMP_MAX_DEPTH, 3, 12)
-SP_PARAM(LmpScale, 202, 80, 400)  // x100
+SP_PARAM(LmpScale, 213, 80, 400)  // x100
 inline int lmp_limit(int depth, bool improving) {
     return LmpScale * (3 + depth * depth) / (100 * (2 - (improving ? 1 : 0)));
 }
@@ -499,9 +504,9 @@ inline int lmp_limit(int depth, bool improving) {
 // searched one ply deeper. If even the other moves beat beta, cut off
 // ("multi-cut").
 inline constexpr bool UseSingular = SR_SINGULAR;
-SP_PARAM(SingularMinDepth, 8, 5, 12)
-SP_PARAM(SingularMarginX8, 15, 4, 48)  // singular beta = TT score - margin/8 * depth
-SP_PARAM(DoubleExtMargin, 21, 0, 80)   // double extension when this far below singular beta
+SP_PARAM(SingularMinDepth, 7, 5, 12)
+SP_PARAM(SingularMarginX8, 14, 4, 48)  // singular beta = TT score - margin/8 * depth
+SP_PARAM(DoubleExtMargin, 22, 0, 80)   // double extension when this far below singular beta
 // Passed-pawn extension: a pawn push to the 7th rank is searched one ply deeper.
 inline constexpr bool UsePawnExt = SR_PAWN_EXT;
 
@@ -517,14 +522,14 @@ inline constexpr bool UseBigBonus       = SR_BIG_BONUS;  // history bonus 16d^2+
 inline constexpr int OrderCounter    = 700'000;
 
 // History bonus for a cutoff at `depth` (penalty = the negative).
-SP_PARAM(HistBonusMul, 17, 4, 48)
-SP_PARAM(HistBonusAdd, 34, 0, 128)
+SP_PARAM(HistBonusMul, 18, 4, 48)
+SP_PARAM(HistBonusAdd, 35, 0, 128)
 SP_PARAM(HistBonusMax, 1544, 400, 4000)
 inline int history_bonus(int depth) {
     return UseBigBonus ? std::min(HistBonusMul * depth * depth + HistBonusAdd * depth, HistBonusMax) : depth * depth;
 }
 #ifndef SR_HIST_LMR_DIV
-#define SR_HIST_LMR_DIV 4403
+#define SR_HIST_LMR_DIV 4126
 #endif
 SP_PARAM(HistLmrDivisor, SR_HIST_LMR_DIV, 1024, 16384)  // history units per ply of LMR
 
@@ -563,13 +568,13 @@ inline constexpr int NmpImprovingMargin = 40;
 #define SR_ASP 1            // aspiration windows at the root
 #endif
 #ifndef SR_ASP_DELTA
-#define SR_ASP_DELTA 12     // initial half-width (cp)
+#define SR_ASP_DELTA 13     // initial half-width (cp)
 #endif
 #ifndef SR_IIR
 #define SR_IIR 1            // internal iterative reduction: PV / cut node without a TT move
 #endif
 #ifndef SR_IIR_DEPTH
-#define SR_IIR_DEPTH 6
+#define SR_IIR_DEPTH 5
 #endif
 #ifndef SR_LMR_CUT
 #define SR_LMR_CUT 0        // +1 LMR at expected cut nodes
@@ -587,10 +592,10 @@ inline constexpr int NmpImprovingMargin = 40;
 #define SR_FUTP 1           // futility pruning of quiet moves (by reduced depth)
 #endif
 #ifndef SR_FUT_BASE
-#define SR_FUT_BASE 99
+#define SR_FUT_BASE 95
 #endif
 #ifndef SR_FUT_MUL
-#define SR_FUT_MUL 103
+#define SR_FUT_MUL 98
 #endif
 #ifndef SR_FUT_DEPTH
 #define SR_FUT_DEPTH 8
@@ -599,16 +604,16 @@ inline constexpr int NmpImprovingMargin = 40;
 #define SR_SEEP 1           // SEE pruning: quiets below -SR_SEE_QUIET*d^2, captures below -SR_SEE_CAP*d
 #endif
 #ifndef SR_SEE_QUIET
-#define SR_SEE_QUIET 21
+#define SR_SEE_QUIET 22
 #endif
 #ifndef SR_SEE_CAP
-#define SR_SEE_CAP 103
+#define SR_SEE_CAP 105
 #endif
 #ifndef SR_HISTP
 #define SR_HISTP 1          // history pruning: quiets with history < -SR_HISTP_MUL*depth
 #endif
 #ifndef SR_HISTP_MUL
-#define SR_HISTP_MUL 1797
+#define SR_HISTP_MUL 1774
 #endif
 #ifndef SR_HISTP_DEPTH
 #define SR_HISTP_DEPTH 4
@@ -617,13 +622,13 @@ inline constexpr int NmpImprovingMargin = 40;
 #define SR_RAZOR 1          // razoring: depth <= 3, eval + margin*depth < alpha -> qsearch
 #endif
 #ifndef SR_RAZOR_MARGIN
-#define SR_RAZOR_MARGIN 248
+#define SR_RAZOR_MARGIN 245
 #endif
 #ifndef SR_CORR
 #define SR_CORR 1           // correction history (pawn + non-pawn structure)
 #endif
 #ifndef SR_CORR_WP
-#define SR_CORR_WP 61
+#define SR_CORR_WP 60
 #endif
 #ifndef SR_CORR_WNP
 #define SR_CORR_WNP 53
@@ -744,14 +749,14 @@ inline constexpr int ProbCutImproving = 50;
 
 // Delta pruning (quiescence search): skip a capture if stand pat + the
 // captured piece's value + DeltaMargin still can't reach alpha.
-SP_PARAM(DeltaMargin, 200, 50, 500)
+SP_PARAM(DeltaMargin, 210, 50, 500)
 
 // Late move reductions: from this depth, quiet moves after the first
 // LmrMinMoves moves are reduced by the log formula below.
 inline constexpr int LmrMinDepth = 3;
 SP_PARAM(LmrMinMoves, 2, 1, 6)
-SP_PARAM(LmrBaseX100, 84, 0, 200)      // reduction = base + ln(depth) * ln(move number) / divisor
-SP_PARAM(LmrDivisorX100, 204, 120, 400)
+SP_PARAM(LmrBaseX100, 90, 0, 200)      // reduction = base + ln(depth) * ln(move number) / divisor
+SP_PARAM(LmrDivisorX100, 189, 120, 400)
 
 inline std::array<std::array<int, 64>, 64> build_lmr_table() {
     std::array<std::array<int, 64>, 64> t{};
